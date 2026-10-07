@@ -546,24 +546,28 @@ const VIEWS = {
     const byVariant = {};
     for (const c of rec.cases) { (byVariant[c.variant] ||= { n: 0, ok: 0, verdicts: {} }); const b = byVariant[c.variant]; b.n++; b.ok += c.match ? 1 : 0; b.verdicts[c.verdict] = (b.verdicts[c.verdict] || 0) + 1; }
     const vrows = Object.entries(byVariant).map(([v, b]) => `<tr><td class="mono">${esc(v)}</td><td>${b.n}</td><td>${Object.entries(b.verdicts).map(([k, n]) => tag(`${k} ×${n}`)).join("")}</td><td>${b.ok === b.n ? '<span class="ok">as expected</span>' : `<span class="no">${b.ok}/${b.n}</span>`}</td></tr>`).join("");
-    const saved = ev.live ? `<div class="card" style="margin-top:12px"><h3>Last saved live run (${esc(ev.live.model)}, ${esc(ev.live.ran_at)})</h3><p class="d" style="margin:0 0 8px">Real model, one run started from this page. The 18 cases were used to tune the prompt, so this is not an independent test.</p><pre>${J(ev.live.summary)}</pre></div>` : "";
+    const lv = ev.live && ev.live.summary, day = ev.live && new Date(ev.live.ran_at).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
+    const saved = lv ? `<div class="card" style="margin-top:12px"><h3>Last saved run</h3><p class="d" style="margin:0">Real model (<span class="mono">${esc(ev.live.model)}</span>), run on ${esc(day)} from this page. The 18 cases were also used to tune the prompt, so this is a sanity check, not an independent test.</p>
+      ${evalCards({ labels: lv.label_accuracy, actions: lv.action_accuracy, unsafe: lv.unsafe_actions, fields: lv.field_accuracy, drafts: lv.drafts_grounded })}
+      <details><summary>Raw numbers (JSON)</summary><pre>${J(ev.live.summary)}</pre></details></div>` : "";
     return `<h1>Safety &amp; Controls</h1>
-      <p class="lede">Two suites, never mixed: the <b>live suite</b> measures the model through the production path; the
-      <b>recorded suite</b> measures the safety layer (validators + rules) against 220 deliberately broken and good outputs, with no model call.</p>
-      <h2>Live suite · 18 cases (14 replies, 4 personalization)</h2>
-      <div class="card"><p>Runs each case through the deployed function one at a time: real model → validator → rules → score against the labels.</p>
+      <p class="lede">Two separate checks, never mixed. <b>Check 1</b> asks whether the AI reads prospects' replies correctly, using the real model.
+      <b>Check 2</b> asks whether the safety net stops a bad AI answer before it can act, using ${rec.summary.recordings} recorded answers, some good and some deliberately broken. It makes no model call.</p>
+      <h2>Check 1 · Does the AI read replies correctly?</h2>
+      <div class="card"><p style="margin:0 0 8px">Runs the 18 test cases (14 replies and 4 email openings) through the same path as production: real model, then the checks, then the rules. Each result is compared with the answer a person labelled. It takes about a minute and uses a little of the model credit.</p>
         <button class="btn" id="runEval">Run the live eval</button> <button class="btn ghost hidden" id="dlEval">Download results (JSON)</button> <span id="evalProg" class="d"></span>
         <div id="evalOut"></div></div>
       ${saved}
-      <h2>Recorded suite · ${rec.summary.recordings} model outputs</h2>
+      <h2>Check 2 · Does the safety net catch bad AI answers?</h2>
+      <p class="d" style="margin:0 0 8px">We took ${rec.summary.recordings} model answers (cut-off, invented quotes, wrong dates, an AI that obeys a hidden instruction, forbidden claims…) and checked that the validators and rules react as expected to each one.</p>
       <div class="grid g3">
-        <div class="card kpi"><div class="v">${esc(rec.summary.verdict_and_codes_match)}</div><div class="l">verdict and violation codes as expected</div></div>
-        <div class="card kpi"><div class="v">${rec.summary.unsafe_after_validation.length}</div><div class="l">unsafe actions that survive validation</div></div>
-        <div class="card kpi"><div class="v">${(rec.summary.verdicts.reject_retry || 0) + (rec.summary.verdicts.reject_escalate || 0)}</div><div class="l">outputs rejected before they could act</div></div>
+        <div class="card kpi"><div class="v">${esc(of(rec.summary.verdict_and_codes_match))}</div><div class="l"><b>Reacted as expected</b><br>The safety net gave the verdict we predicted for every recorded answer.</div></div>
+        <div class="card kpi"><div class="v">${(rec.summary.verdicts.reject_retry || 0) + (rec.summary.verdicts.reject_escalate || 0)}</div><div class="l"><b>Rejected before acting</b><br>Broken answers that were stopped, retried or sent to a person.</div></div>
+        <div class="card kpi"><div class="v ${rec.summary.unsafe_after_validation.length ? "no" : "ok"}">${rec.summary.unsafe_after_validation.length}</div><div class="l"><b>Got through unsafe</b><br>Answers that passed every check and would have caused a wrong action.</div></div>
       </div>
-      <div class="banner warn" style="margin-top:12px">The one that survives — <span class="mono">${esc(rec.summary.unsafe_after_validation.join(", "))}</span> — is a
-      confident, well-formed, quote-backed wrong label on an ambiguous reply. Validation cannot catch that; this is why the live eval,
-      the confidence threshold and 100% human review of AI-driven handoffs at launch exist.</div>
+      <div class="banner warn" style="margin-top:12px"><b>The one that gets through</b> (<span class="mono">${esc(rec.summary.unsafe_after_validation.join(", "))}</span>) is a confident, well-formed answer with the wrong label on an ambiguous reply.
+      Nothing in the answer looks broken, so no check can catch it. That is why a person reviews every AI-driven handoff at launch, and why the live check and the confidence threshold exist.</div>
+      <details class="card" style="margin-top:12px"><summary>All ${Object.keys(byVariant).length} kinds of answer tested (technical)</summary><div class="tablewrap" style="margin-top:8px"><table><thead><tr><th>kind of answer</th><th>how many</th><th>verdict</th><th>result</th></tr></thead><tbody>${vrows}</tbody></table></div></details>
       <div class="card" id="autonomy" style="margin-top:12px"><h3>What must be true before the AI acts on its own</h3>
         <p class="d" style="margin:0 0 6px">Today a person reviews every AI-driven handoff and approves every outreach email. None of the steps below has happened yet.</p>
         <ul class="why">
@@ -572,8 +576,7 @@ const VIEWS = {
           <li><b>Review sampled down slowly:</b> 100% → 20% → 5% of AI-driven actions, only while reviewers overturn fewer than 2% per label.</li>
           <li><b>Release gate and kill switch:</b> the live eval runs on every prompt or model change; one switch sends every AI-driven action back to people.</li>
           <li><b>Sign-offs:</b> legal and brand approve the content rules and each language (only English is approved here); data retention and the provider's data terms are agreed.</li>
-        </ul></div>
-      <div class="card tablewrap" style="margin-top:12px"><table><thead><tr><th>variant</th><th>n</th><th>verdicts</th><th>result</th></tr></thead><tbody>${vrows}</tbody></table></div>`;
+        </ul></div>`;
   },
 
   async stream() {
@@ -937,14 +940,23 @@ function evalSummary(out) {
     drafts_grounded: pct(dr.filter(r => r.grounded).length, dr.length), errors: out.filter(r => r.error).length };
 }
 
+const of = v => String(v).replace("/", " of ");
+function evalCards(m) {
+  const card = (v, l, d, cls = "") => `<div class="card kpi"><div class="v ${cls}">${esc(v)}</div><div class="l"><b>${l}</b><br>${d}</div></div>`;
+  return `<div class="grid g3" style="margin:12px 0">
+    ${card(of(m.labels), "Understood the reply", "The AI picked the right type of reply (interested, not now, wrong person…).")}
+    ${card(of(m.actions), "Ended in the right next step", "After the rules had the final word, the account got the step the labelled answer expects.")}
+    ${card(m.unsafe, "Unsafe actions", "Contacting someone who must not be contacted, or similar. The goal is always zero.", Number(m.unsafe) === 0 ? "ok" : "no")}
+    ${card(of(m.fields), "Details picked up correctly", "Team size, dates, referred contacts, pain points and so on, read from the reply text.")}
+    ${card(of(m.drafts), "Emails that stick to the facts", "Opening lines that only use a verified, recent fact about the company.")}
+  </div>`;
+}
 function evalTable(out) {
   const rep = out.filter(r => r.kind === "reply"), dr = out.filter(r => r.kind === "draft"), err = out.filter(r => r.error);
   const pct = (a, b) => b ? `${a}/${b} (${Math.round(100 * a / b)}%)` : "—";
-  const sum = `<div class="grid g4" style="margin:12px 0">
-    <div class="card kpi"><div class="v">${pct(rep.filter(r => r.label_correct).length, rep.length)}</div><div class="l">labels correct</div></div>
-    <div class="card kpi"><div class="v">${pct(rep.filter(r => r.action_correct).length, rep.length)}</div><div class="l">actions correct</div></div>
-    <div class="card kpi"><div class="v">${out.filter(r => r.unsafe).length}</div><div class="l">unsafe actions</div></div>
-    <div class="card kpi"><div class="v">${pct(dr.filter(r => r.grounded).length, dr.length)}</div><div class="l">drafts grounded</div></div></div>`;
+  const sum = evalCards({ labels: pct(rep.filter(r => r.label_correct).length, rep.length), actions: pct(rep.filter(r => r.action_correct).length, rep.length),
+    unsafe: out.filter(r => r.unsafe).length, fields: pct(rep.reduce((x, r) => x + (r.fields_correct || 0), 0), rep.reduce((x, r) => x + (r.fields_total || 0), 0)),
+    drafts: pct(dr.filter(r => r.grounded).length, dr.length) }) + (err.length ? `<p class="no">${err.length} case(s) failed to run.</p>` : "");
   const rows = out.map(r => r.error ? `<tr><td class="mono">${esc(r.case_id)}</td><td colspan="4" class="no">${esc(r.error)}</td></tr>` :
     r.kind === "reply" ? `<tr><td class="mono">${esc(r.case_id)}</td><td>${esc(r.expected_label)} → ${esc(r.expected_action)}</td><td>${esc(r.label ?? "—")} → ${esc(r.action)}</td>
       <td>${tag(r.verdict)} ${r.violation_codes.map(c => tag(c, "warn")).join("")} fields ${r.fields_correct}/${r.fields_total}</td>
@@ -952,7 +964,7 @@ function evalTable(out) {
       <tr><td></td><td colspan="4"><details><summary class="d">Model output${r.field_misses && r.field_misses.length ? ` · field misses: ${esc(r.field_misses.join(", "))}` : ""}</summary>${(r.raw_outputs || []).map(x => `<pre>${esc(x)}</pre>`).join("")}</details></td></tr>` :
     `<tr><td class="mono">${esc(r.case_id)}</td><td>facts ${esc(r.expected_usable_fact_ids.join(", ") || "none")}</td><td>${esc(r.mode)} · cites ${esc(r.cited_fact_ids.join(", ") || "nothing")}</td>
       <td>${tag(r.verdict)} ${r.codes.map(c => tag(c, "warn")).join("")}</td><td>${r.grounded ? '<span class="ok">grounded</span>' : '<span class="no">UNSAFE</span>'}</td></tr>`).join("");
-  return sum + `<div class="tablewrap"><table><thead><tr><th>case</th><th>expected</th><th>model → rules</th><th>validation</th><th>result</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  return sum + `<details><summary>Case by case (technical)</summary><div class="tablewrap"><table><thead><tr><th>case</th><th>expected</th><th>model → rules</th><th>validation</th><th>result</th></tr></thead><tbody>${rows}</tbody></table></div></details>`;
 }
 
 const fmt = n => Math.round(n).toLocaleString("en-US");
