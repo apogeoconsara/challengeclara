@@ -12,7 +12,7 @@ only; every external call goes through idempotency keys, retries and reconciliat
 calendar and email systems; every step is written to an audit log. All data is synthetic, and **no email is ever
 sent**: outreach is written to a mock ledger, by construction.
 
-- Live page: the Netlify site (https://clara-growth-agent-demo.netlify.app) — recorded engine runs of every scenario,
+- Live page: the Netlify site (https://growth-orchestration-system.netlify.app) — recorded engine runs of every scenario,
   a live AI panel and a live eval button.
 - Docs: [decision log](docs/DECISION_LOG.md) · [AI: scope, validation, autonomy](docs/AI.md) ·
   [measurement plan](docs/MEASUREMENT_PLAN.md) · [production thinking](docs/PRODUCTION.md) ·
@@ -21,7 +21,7 @@ sent**: outreach is written to a mock ledger, by construction.
 ## Quick start (Python 3.11+, no dependencies; node 20+ only for the web tests)
 
 ```bash
-python3 -m unittest discover -s tests -t .        # 134 tests: data, rules, engine, AI validators, web parity (incl. node tests)
+python3 -m unittest discover -s tests -t .        # 135 tests: data, rules, engine, AI validators, web parity (incl. node tests); 5 skip without the 50k data
 python3 -m orchestrator compare-scoring v1 v2        # what changing the scoring does, measured by the engine on the 50k world (about 2 minutes)
 python3 -m orchestrator export-overview             # 50k summary + operations metrics for the web page (needs `make data` first, about a minute)
 python3 -m orchestrator demo                      # the six demo flows (five on the page, D5 under "More cases"), step by step (offline fixture for AI steps)
@@ -34,7 +34,7 @@ python3 -m orchestrator demo --flow D4 --live     # ambiguous / unsafe AI flow w
 python3 -m orchestrator serve --port 8080         # local webhook receiver: POST /webhook, GET /accounts/<id>
 
 python3 -m orchestrator export-web                # regenerate the page data + the prompts module for the function
-python3 -m generator all --seed 42 --n 50000      # regenerate the 50k-account synthetic world (~1.5 min)
+python3 -m generator all --seed 42 --n 50000      # regenerate the 50k-account synthetic world (~1.5 min, 390 MB, not in git)
 ```
 
 ## Architecture
