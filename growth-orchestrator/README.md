@@ -18,21 +18,74 @@ construction, and only after a person approves it.
   [measurement plan](docs/MEASUREMENT_PLAN.md) · [production thinking](docs/PRODUCTION.md) ·
   [challenge traceability](data/PDF_TRACEABILITY.md) · [data](data/README.md)
 
-## Run it (Python 3.11+, no dependencies; node 20+ only for the web tests)
+## Setup and usage
+
+Requirements: Python 3.11+ (standard library only, nothing to install). Node 20 and Chromium are needed only for the
+page tests.
 
 ```bash
-python3 -m generator all --seed 42 --n 50000     # the 50k synthetic world, ~1.5 min, 390 MB, not in git
-python3 -m unittest discover -s tests -t .       # 168 tests (5 skip without the 50k data)
-python3 -m orchestrator demo                     # the demo flows, step by step (offline fixture for AI steps)
-python3 -m orchestrator eval --recorded          # validators vs 220 recorded model outputs, no model call
+git clone https://github.com/apogeoconsara/challengeclara.git
+cd challengeclara/growth-orchestrator            # every command below runs from here
+```
 
+**1. Try it on the committed sample, no setup.** A 500-account sample world and the 89 golden scenarios are in
+`data/seed/`. AI steps use an offline stand-in for the model unless `--live` is passed.
+
+```bash
+python3 -m orchestrator demo                     # the 6 demo flows step by step: success, duplicate, failure,
+                                                 # unsafe AI, malformed AI, out-of-order race
+python3 -m orchestrator demo --flow D1           # one flow
+python3 -m orchestrator stream                   # all 561 sample deliveries through the engine, summarised
+python3 -m orchestrator eval --recorded          # validators vs 220 recorded model outputs (writes to evals/results/)
+```
+
+**2. Generate the 50k world and run the tests.**
+
+```bash
+python3 -m generator all --seed 42 --n 50000     # ~1.5 min, ~390 MB in data/generated/ (not in git); same seed, same bytes
+python3 -m unittest discover -s tests -t .       # 168 tests, ~4 min (5 skip without the 50k world)
+```
+
+**3. Send a webhook yourself and approve the email.** `serve` loads the sample world and talks to mock systems only.
+
+```bash
+python3 -m orchestrator serve --port 8080
+```
+
+In a second terminal:
+
+```bash
+curl -s -X POST localhost:8080/webhook -H 'content-type: application/json' -d '{"delivery_id":"dlv_try_1",
+  "event_id":"evt_try_1","idempotency_key":"try-1","type":"account_targeted","schema_version":"1.0","source":"list_import",
+  "account_id":"acc_000282","contact_id":null,"occurred_at":"2026-10-01T16:04:12Z","received_at":"2026-10-01T16:04:14Z",
+  "payload":{"list_id":"tl_2026_10_w1","origin":"target_list"}}'   # -> action "contact", email "pending_approval"
+curl -s localhost:8080/approvals                 # the held draft and its key
+curl -s -X POST localhost:8080/approvals/send:acc_000282:con_000282_3:1/approve -d '{"reviewer":"<your name>"}'
+                                                 # -> released now, or "scheduled" for the recipient's send window
+curl -s localhost:8080/accounts/acc_000282       # state, decisions and the audit trail
+```
+
+Sending the same webhook again returns `ignore_duplicate`, and an approval without a `reviewer` is refused.
+`POST /approvals/<key>/reject` with `{"reviewer": ..., "reason": ...}` closes a draft instead.
+
+**4. Open the page locally.**
+
+```bash
+cd .. && python3 -m http.server 8000 --directory public   # then open http://localhost:8000
+```
+
+Everything works except the live AI panel, which needs the Netlify function: use the deployed site for that.
+
+**5. Use the real model (optional).**
+
+```bash
 export ANTHROPIC_API_KEY=...                     # in your shell only, never in a file
-python3 -m orchestrator eval --live              # core cases against the real model -> evals/results/
-python3 -m orchestrator serve --port 8080        # local receiver: POST /webhook, GET /accounts/<id>, GET /approvals, POST /approvals/<key>/approve|reject
+python3 -m orchestrator eval --live              # the 18 live eval cases -> evals/results/
+python3 -m orchestrator demo --live              # the demo flows with the real model
 ```
 
 `python3 -m orchestrator export-web` and `export-overview` regenerate the page data; `compare-scoring v1 v2` compares
-two scoring versions on the full event stream. A 500-account sample is committed in `data/seed/sample/`.
+two scoring versions on the full event stream.
 
 ## Architecture
 
