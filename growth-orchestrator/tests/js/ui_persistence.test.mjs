@@ -1,14 +1,16 @@
 // Switching tabs or reloading must not lose what a person did on the page. Needs a browser: skipped when playwright-core
-// (or Chromium) is not available. Run from the repo root: node growth-orchestrator/tests/js/ui_persistence.test.mjs
+// (or Chromium) is not available, unless REQUIRE_BROWSER=1 (set in CI), where a missing browser is a failure.
+// Run from the repo root: node growth-orchestrator/tests/js/ui_persistence.test.mjs
 import http from "node:http";
 import { readFileSync, existsSync } from "node:fs";
 import { extname, join } from "node:path";
 import assert from "node:assert/strict";
 
+const skip = why => { console.log("skipped: " + why); process.exit(process.env.REQUIRE_BROWSER === "1" ? 1 : 0); };
 let chromium;
-try { ({ chromium } = await import("playwright-core")); } catch { console.log("skipped: playwright-core not installed"); process.exit(0); }
+try { ({ chromium } = await import("playwright-core")); } catch { skip("playwright-core not installed"); }
 const exe = process.env.CHROMIUM_PATH || ["/opt/pw-browsers/chromium", "/usr/bin/chromium", "/usr/bin/chromium-browser"].find(existsSync);
-if (!exe) { console.log("skipped: no Chromium found"); process.exit(0); }
+if (!exe) skip("no Chromium found");
 
 const types = { ".html": "text/html", ".json": "application/json", ".js": "text/javascript" };
 const server = http.createServer((req, res) => {
