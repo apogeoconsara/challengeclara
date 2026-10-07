@@ -339,10 +339,10 @@ const VIEWS = {
         <div class="card kpi"><div class="v">${passed}/${n}</div><div class="l">situations reproduced exactly by the engine: one for each eligibility rule and each risk the brief lists (opt-outs, duplicates, failures, late events…)</div></div>
         <div class="card kpi"><div class="v">${esc(stream.agreement_with_truth)}</div><div class="l">sample deliveries matching the independent answer key</div></div>
         <div class="card kpi"><div class="v">${esc(ev.recorded.summary.verdict_and_codes_match)}</div><div class="l">AI outputs (good and deliberately broken) judged correctly by the safety checks</div></div>
-      <details class="card" style="margin-top:10px"><summary>Why ${n} situations? It is not a target</summary>
+      </div>
+      <details class="card" style="margin-top:14px"><summary>Why ${n} situations? It is not a target</summary>
         <p class="d" style="margin:8px 0 0">The number is a result, not a goal. We wrote one test situation for each eligibility rule and for each thing the brief says can go wrong, and that came to ${n}.
         ${scenarioGroups(runs).map(([g, c]) => `${c} ${g}`).join(", ")}. Each situation is a case in <span class="mono">golden_scenarios.jsonl</span>, run on a fresh database and compared with the expected decision. Seven would leave rules untested; padding to a round hundred would repeat cases.</p></details>
-      </div>
       <details class="card" style="margin-top:14px"><summary>Where the data and the texts come from</summary>
         <p class="d" style="margin:8px 0 0">Every company, person and event is <b>synthetic</b>: a generator creates the 50,000-company world from a fixed seed, so it is identical every time. Nobody real appears anywhere.
         The 117 seed replies, the 89 test situations, the 220 recorded model outputs and the wording of this site were <b>drafted with an AI assistant</b>. A <b>human review of them is still pending</b>. Numbers marked simulated or as assumptions (weights, minutes per task, price per AI call, the experiment) are illustrative and are not Clara's data.</p></details>
