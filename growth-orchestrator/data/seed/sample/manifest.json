@@ -62,7 +62,7 @@
     },
     "truth/truth_events.jsonl": {
       "rows": 561,
-      "sha256": "3ad8602db2ca97758fce436e6a256c7b88a82deae8e04d2f841a783d5cfd8814"
+      "sha256": "7e5adf18263cccb9a8d1bfeeb9ab8c5305e0a1bfc4847650f1155739c8b2b16a"
     },
     "truth/truth_facts.jsonl": {
       "rows": 849,
@@ -73,6 +73,6 @@
       "sha256": "14c57913772e1ab1ae059c2a65ad31b510e6d79439c22732bfff2c82e0e8d464"
     }
   },
-  "determinism_hash": "6404fe30bfdc3e653e8bb291acd43bc8",
+  "determinism_hash": "bcceb37f8f10cd64b74c5e6de2d1b037",
   "note": "truth/ holds ground-truth labels. The orchestrator must NEVER read it; only tests/evals do."
 }

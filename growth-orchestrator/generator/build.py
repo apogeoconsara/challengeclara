@@ -13,7 +13,7 @@ import json
 from collections import defaultdict
 from datetime import timedelta
 
-from . import impact, oracle
+from . import impact, oracle, stateful
 from .config import (AS_OF, BANDS, CALENDAR_BEHAVIORS, COUNTRIES, CRM_BEHAVIORS, EMAIL_STATUS_WEIGHTS, ENRICH_BEHAVIORS,
                      FREE_EMAIL_DOMAINS, FUNCTION_WEIGHTS, INDUSTRIES, LIST_BURST_MINUTES, LIST_DROP_DAYS,
                      LIST_WEIGHTS, LOST_COOLDOWN_DAYS, N_CONTACTS_WEIGHTS, OPEN_STAGES, RATE_CONTENT_DUP,
@@ -893,6 +893,9 @@ def _perturb(w, ctx, base):
                              "account_id": ev["account_id"], "perturbation": "malformed", "malformed_kind": kind,
                              "expected_handling": "dead_letter", "expected_action": None}))
     rows.sort(key=lambda r: (r[0]["received_at"], r[0]["delivery_id"]))
+    # The key per account is a snapshot; events delivered earlier in the stream can change that state. Re-derive the
+    # expectation of any account_targeted that follows such a change (see generator/stateful.py).
+    w.stateful_corrections = stateful.correct_truth(w, rows)
     for env, truth in rows:
         w.events.append(env)
         w.truth_events.append(truth)
