@@ -321,10 +321,14 @@ const VIEWS = {
   async scenarios() { state.more = true; return VIEWS.flows(); },
 
   async priority() {
-    const ov = await load("overview"); await load("scoring_compare");
+    const ov = await load("overview"), ap = await load("approvals"), op = await load("operations"); await load("scoring_compare");
     return `<h1>Account Prioritization</h1>
       <p class="lede">Every company that passed the safety checks gets a score out of ${maxScore(ov, weights(ov.config))}. The score answers one question: is this company worth a
       <b>personal outreach email</b> (a first email or a follow-up; drafted, not sent) now, or should it join the <b>slow nurture track</b> (no email for now) until it shows more promise?</p>
+      <div class="card" style="margin-bottom:12px"><h3>Three counts, three units</h3>
+        <div class="d"><b>${fmt(ap.total_prepared)}</b> = distinct companies that, in the current snapshot, are ready for an outreach email in tiers A and B (this page and the Approval Queue).<br>
+        <b>${fmt(op.final_actions.contact)}</b> = outreach-email drafts produced while replaying all ${fmt(op.events)} events of the stream (a company can produce more than one; see Run Operations).<br>
+        <b>${fmt(op.emails_held_for_approval)}</b> = drafts still held as <code>pending_approval</code> when the stream ends. They differ because they count different things, not because anything is missing.</div></div>
       <div class="banner warn">These weights are my assumptions, not Clara's real ideal-customer profile. Change any number and the page recalculates all ${fmt(ov.n_accounts)} companies.
       Your edits are a simulation on this page; the engine uses the version marked "used by the engine".</div>
       <h2>1. How points are earned</h2><div class="card" id="priRules"></div>
@@ -392,9 +396,9 @@ const VIEWS = {
       </div>
       <h2>Run a full flow</h2>
       <div class="d" style="margin-bottom:4px">How one event is handled</div>
-      <div class="chips" id="flowChips">${fl.flows.filter(f => f.group === "core").map(f => `<button data-run="${f.id}" class="${f.id === (state.runFlow || "F1") ? "active" : ""}">${esc(f.title)}</button>`).join("")}</div>
+      <div class="chips" id="flowChips">${fl.flows.filter(f => f.group === "core").map(f => `<button data-run="${f.id}" class="${f.id === (state.runFlow || "F0") ? "active" : ""}">${esc(f.title)}</button>`).join("")}</div>
       <div class="d" style="margin-bottom:4px">When the CRM misbehaves</div>
-      <div class="chips" id="crmChips">${fl.flows.filter(f => f.group === "crm").map(f => `<button data-run="${f.id}" class="${f.id === (state.runFlow || "F1") ? "active" : ""}">${esc(f.title)}</button>`).join("")}</div>
+      <div class="chips" id="crmChips">${fl.flows.filter(f => f.group === "crm").map(f => `<button data-run="${f.id}" class="${f.id === (state.runFlow || "F0") ? "active" : ""}">${esc(f.title)}</button>`).join("")}</div>
       <div class="card" id="runCard"></div>
       <h2>Three systems, one conductor</h2>
       <p class="lede" style="margin-bottom:10px">The system sits between the AI, the CRM and outreach. It is the only one that decides, and each system gets its own safety rule. The order is always the same: read the state, rules decide, AI proposes, the validator checks, the CRM write is recorded, the outreach is prepared, a person approves, and the send is re-checked.</p>
@@ -404,7 +408,7 @@ const VIEWS = {
   },
 
   async ops() {
-    const o = await load("operations"), ev = await load("evals"), ov = await load("overview");
+    const o = await load("operations"), ev = await load("evals"), ov = await load("overview"), ap = await load("approvals");
     const pc = (a, b, d = 1) => b ? (100 * a / b).toFixed(d) + "%" : "-";
     const autoRate = o.automated / o.decided, reviewRate = o.review_queue / o.decided, llmFail = o.ai.calls ? o.ai.failed / o.ai.calls : 0, deadRate = o.dead_letters / o.events;
     const unsafeAI = ev.recorded.summary.unsafe_after_validation;
@@ -426,6 +430,7 @@ const VIEWS = {
         ${tile("Real emails sent", "0", `${fmt(o.emails_held_for_approval)} drafts held for approval, ${fmt(o.emails_in_simulated_log)} in the simulated log`, tag("by construction", "good"))}
       </div>
       <p class="d">Targets are my assumptions, not Clara's. They show how each number would be read as an alert.</p>
+      <p class="d"><b>Units:</b> these tiles count events, not companies. ${fmt(o.final_actions.contact)} outreach-email drafts were produced while replaying all ${fmt(o.events)} events, and ${fmt(o.emails_held_for_approval)} of them are still held as <code>pending_approval</code> at the end of the stream. The ${fmt(ap.total_prepared)} on Priority and in the Approval Queue count distinct companies ready for outreach in tiers A and B in the current snapshot, so the three figures do not contradict each other.</p>
       <div class="banner warn" style="margin-top:14px"><b>Known risk.</b> ${unsafeAI.length ? `In the recorded safety suite, ${unsafeAI.length} AI output (${esc(unsafeAI.join(", "))}) passes validation although its label is wrong, because it is wrong and confident at the same time. It is the weakest spot, documented in the decision log.` : "The recorded safety suite found no AI output that passes validation unsafely."}</div>
       <h2>What happened to the ${fmt(o.events)} events</h2>
       <div class="grid g3">
@@ -514,7 +519,7 @@ const VIEWS = {
     return `<h1>Event Stream</h1><p class="lede">All ${s.deliveries} deliveries of the sample world (500 accounts) through one engine
       instance, as of the snapshot time, including duplicates, garbage, late races, replies and every mock failure mode.</p>
       <div class="grid g4">
-        <div class="card kpi"><div class="v">${esc(s.agreement_with_truth)}</div><div class="l">decisions matching the independent truth*</div></div>
+        <div class="card kpi"><div class="v">${esc(s.agreement_with_truth)}</div><div class="l">decisions matching the independent truth</div></div>
         <div class="card kpi"><div class="v">${s.emails_held_for_approval}</div><div class="l">outreach emails held for approval (${s.mock_emails} written to the mock ledger)</div></div>
         <div class="card kpi"><div class="v">${s.review_queue}</div><div class="l">items queued for a human</div></div>
         <div class="card kpi"><div class="v">${s.dead_letters}</div><div class="l">dead letters (garbage + exhausted retries)</div></div>
@@ -524,8 +529,7 @@ const VIEWS = {
         <div class="card"><h3>Decision</h3><table>${kv(s.actions)}</table></div>
         <div class="card"><h3>Outcome after execution</h3><table>${kv(s.final_actions)}</table></div>
       </div>
-      <p class="lede" style="margin-top:12px">*The one difference is explained: an earlier event in the same stream closes that account's open deal,
-      so the stateful engine routes it to its AE while the static truth still sees the deal open. ${esc(s.label)}</p>`;
+      <p class="lede" style="margin-top:12px">Agreement is complete: the engine and the answer key give the same action on every delivery in this stream. The key is stateful, so it replays the stream in delivery order and applies the effects of earlier events (an unsubscribe, a bounce, an opt-out, a deal opened or closed) before judging later ones. ${esc(s.label)}</p>`;
   },
 };
 
@@ -912,7 +916,7 @@ const RUN = { timers: [], flow: null, step: -1, running: false };
 const RDONE = store.get("orch.runDone") || {};                         // flows already run to the end (kept across tabs and reloads)
 const TRUTH = store.get("orch.truth") || { replayed: false, live: null };
 const STAGE_ICON = { event: "1", state: "2", rules: "3", model: "4", validator: "5", action: "6", audit: "7" };
-const curFlow = () => DATA.flows.flows.find(x => x.id === (state.runFlow || "F1"));
+const curFlow = () => DATA.flows.flows.find(x => x.id === (state.runFlow || "F0"));
 const runStep = f => RUN.flow === f.id ? RUN.step : (RDONE[f.id] ? f.stages.length - 1 : -1);
 const isRunning = f => RUN.running && RUN.flow === f.id;
 function stopRun() { RUN.timers.forEach(clearTimeout); RUN.timers = []; RUN.running = false; }

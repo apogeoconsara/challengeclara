@@ -36,6 +36,14 @@ class Flows(unittest.TestCase):
         self.assertEqual([s["status"] for s in f["stages"][1:5]], ["skipped"] * 4)
         self.assertEqual(len(f["audit"]), 1)
 
+    def test_the_default_flow_shows_an_outreach_email_from_draft_to_the_simulated_log(self):
+        action = next(s for s in self.flows["F0"]["stages"] if s["id"] == "action")
+        text = " | ".join(action["lines"])
+        order = [text.index(x) for x in ("pending approval", "Approved by demo reviewer", "simulated log")]
+        self.assertEqual(order, sorted(order))
+        self.assertEqual(sum("Email recorded" in l for l in action["lines"]), 1)
+        self.assertNotIn("attempts", text)               # a clean send: no retry noise in the default flow
+
     def test_retried_send_records_exactly_one_email(self):
         action = next(s for s in self.flows["F4"]["stages"] if s["id"] == "action")
         self.assertEqual(sum("Email recorded" in l for l in action["lines"]), 1)
