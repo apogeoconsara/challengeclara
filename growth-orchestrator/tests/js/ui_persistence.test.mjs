@@ -133,4 +133,9 @@ replyBody = reply({ follow_up_date: null }); await page.click("#runReply"); awai
 assert.match(await text(".rnext"), /8 October 2026[\s\S]*default of 7 days/);
 assert.equal(await page.$eval("#replyOut details", e => e.open), false, "technical details should start folded");
 
+// 12. Evaluation: all 18 live cases are shown as cards, each with the result of the last saved run
+await goSec("aisafety", "evals"); await page.waitForSelector(".ccase");
+assert.equal((await page.$$(".ccase")).length, 18, "the 18 evaluation cases should all be listed");
+assert.ok((await page.$$(".ccase.pass")).length > 0, "cards should carry the saved run's result");
+
 await browser.close(); server.close();

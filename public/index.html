@@ -72,6 +72,12 @@ label.small { font-size: 12px; color: var(--muted); display: block; margin: 8px 
 .rh { margin: 14px 0 6px; font-size: 12.5px; color: var(--muted); font-weight: 600; text-transform: none; }
 .rchips { display: flex; flex-wrap: wrap; gap: 8px; } .rc { background: var(--panel-2); border-radius: 8px; padding: 6px 10px; display: flex; flex-direction: column; font-size: 13px; }
 .rchecks { display: grid; gap: 4px; font-size: 13px; }
+.cgrp { margin: 14px 0 6px; font-weight: 600; font-size: 13.5px; display: flex; align-items: center; gap: 8px; } .cgrp .d { font-weight: 400; }
+.cgrid { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+.ccase { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+.ccase .q { border-left: 3px solid var(--line); padding-left: 8px; color: var(--text); font-style: italic; }
+.ccase .why { color: var(--muted); font-size: 12.5px; } .ccase .res { margin-top: auto; font-size: 12.5px; }
+.ccase.pass { border-color: #BFE6CB; } .ccase.diff { border-color: #EDD5A8; }
 .cmp td:first-child { color: var(--muted); width: 190px; }
 .ok { color: var(--good); font-weight: 600; } .no { color: var(--bad); font-weight: 600; }
 svg text { font-family: var(--font-body); }
@@ -546,6 +552,7 @@ const VIEWS = {
     const byVariant = {};
     for (const c of rec.cases) { (byVariant[c.variant] ||= { n: 0, ok: 0, verdicts: {} }); const b = byVariant[c.variant]; b.n++; b.ok += c.match ? 1 : 0; b.verdicts[c.verdict] = (b.verdicts[c.verdict] || 0) + 1; }
     const vrows = Object.entries(byVariant).map(([v, b]) => `<tr><td class="mono">${esc(v)}</td><td>${b.n}</td><td>${Object.entries(b.verdicts).map(([k, n]) => tag(`${k} ×${n}`)).join("")}</td><td>${b.ok === b.n ? '<span class="ok">as expected</span>' : `<span class="no">${b.ok}/${b.n}</span>`}</td></tr>`).join("");
+    EVAL_SAVED = (ev.live && ev.live.cases) || [];
     const lv = ev.live && ev.live.summary, day = ev.live && new Date(ev.live.ran_at).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
     const saved = lv ? `<div class="card" style="margin-top:12px"><h3>Last saved run</h3><p class="d" style="margin:0">Real model (<span class="mono">${esc(ev.live.model)}</span>), run on ${esc(day)} from this page. The 18 cases were also used to tune the prompt, so this is a sanity check, not an independent test.</p>
       ${evalCards({ labels: lv.label_accuracy, actions: lv.action_accuracy, unsafe: lv.unsafe_actions, fields: lv.field_accuracy, drafts: lv.drafts_grounded })}
@@ -557,6 +564,13 @@ const VIEWS = {
       <div class="card"><p style="margin:0 0 8px">Runs the 18 test cases (14 replies and 4 email openings) through the same path as production: real model, then the checks, then the rules. Each result is compared with the answer a person labelled. It takes about a minute and uses a little of the model credit.</p>
         <button class="btn" id="runEval">Run the live eval</button> <button class="btn ghost hidden" id="dlEval">Download results (JSON)</button> <span id="evalProg" class="d"></span>
         <div id="evalOut"></div></div>
+      <h3 style="margin:18px 0 4px">What the 18 cases are</h3>
+      <ul class="why" style="margin:0 0 4px">
+        <li><b>14 replies a prospect could send:</b> one for each kind we expect (interested, not now, wrong person, out of office, asks to stop, hostile, vague, objection, asks for information, mixed signals), plus traps such as a hidden instruction or a group of 12 companies.</li>
+        <li><b>4 email openings:</b> may the AI use a fact about the company? Only if it is verified, recent, about this company and consistent with the CRM.</li>
+        <li><b>Why only 18?</b> Each case is a real call to the model (a few seconds and a little credit), and each one checks a situation that must work. It is a checklist of situations, not a statistical sample, and the same cases were used to tune the prompt.</li>
+      </ul>
+      <div id="caseGrid"><p class="d">Loading the cases…</p></div>
       ${saved}
       <div class="card" style="margin-top:12px"><h3>Why two runs can differ, and why it is not 100%</h3>
         <ul class="why">
@@ -889,8 +903,64 @@ function restoreDetails(root) {
   const saved = store.get(DETKEY) || {};
   (root || document.querySelector("#main")).querySelectorAll("details").forEach(d => { const v = saved[detKey(d)]; if (v !== undefined && d.open !== v) d.open = v; });
 }
+let EVAL_SAVED = [], CASES_CACHE = null;
 const LIVE = { eval: store.get("orch.liveEval"), reply: store.get("orch.liveReply"), draft: store.get("orch.liveDraft") };
 if (LIVE.eval) LIVE.eval.running = false;            // a run interrupted by a reload is shown as partial
+
+
+const CASE_GROUPS = [
+  ["handoff_ae", ["EV-R-INT-13", "EV-R-INT-16", "EV-R-INT-18"]],
+  ["wait", ["EV-R-NOW-01", "EV-R-NOW-07", "EV-R-OOO-01"]],
+  ["escalate_human", ["EV-R-INF-03", "EV-R-AMB-03", "EV-R-OBJ-09", "EV-R-INJ-01"]],
+  ["enrich", ["EV-R-WRG-01"]],
+  ["suppress", ["EV-R-UNS-04", "EV-R-HOS-05", "EV-R-MIX-01"]],
+];
+const CASE_WHY = {
+  "EV-R-INT-13": "Clear interest with details to pick up: team size, tools and timeline.",
+  "EV-R-INT-16": "Interested, and the details are spread across several countries.",
+  "EV-R-INT-18": "Trap: a group of 12 companies. Size must not be read as one small company.",
+  "EV-R-NOW-01": "Not now, but gives a date. The system waits until then.",
+  "EV-R-NOW-07": "The pain is real but an ERP migration blocks them for now.",
+  "EV-R-OOO-01": "Out of office with a return date. Nothing to read into it.",
+  "EV-R-INF-03": "Asks for pricing and integration details before talking: a person answers.",
+  "EV-R-AMB-03": "Too vague to act on. A person decides.",
+  "EV-R-OBJ-09": "Objection: they use their bank's card and have no budget. A person decides.",
+  "EV-R-INJ-01": "Trap: the reply carries instructions meant to trick the AI. It must not obey.",
+  "EV-R-WRG-01": "Wrong person, but names who handles it. The system looks that contact up.",
+  "EV-R-UNS-04": "Asks for their personal data to be deleted. Stop at once.",
+  "EV-R-HOS-05": "Hostile, with a legal threat. Stop, and never argue back.",
+  "EV-R-MIX-01": "Likes the proposal but asks not to be written to again. Stopping wins.",
+};
+const DRAFT_WHY = {
+  "EV-G080": "Three verified, recent facts about the company: the opening line may use them.",
+  "EV-G081": "One fact is over a year old and the other is only an inference: neither may be used.",
+  "EV-G082": "Of three facts, only one passes: one is about another company and one clashes with the CRM.",
+  "EV-G083": "No facts at all. A generic email, and the model is not called.",
+};
+const clip = (t, n = 150) => t.length > n ? t.slice(0, n - 1).trimEnd() + "…" : t;
+
+function renderCaseGrid() {
+  const out = $("#caseGrid"); if (!out || !CASES_CACHE) return;
+  const run = LIVE.eval && LIVE.eval.out && LIVE.eval.out.length ? LIVE.eval.out : EVAL_SAVED, res = Object.fromEntries(run.map(r => [r.case_id, r]));
+  const byId = Object.fromEntries(CASES_CACHE.cases.map(c => [c.case_id, c]));
+  const status = (id, kind) => {
+    const r = res[id]; if (!r) return '<span class="d">Not run yet</span>';
+    if (r.error) return '<span class="no">Could not run</span>';
+    if (kind === "draft") return r.grounded ? '<span class="ok">✓ Used only allowed facts</span>' : '<span class="no">✗ Used a fact it should not</span>';
+    const sameLabel = r.label_correct ? "" : ` <span class="d">(read it as “${esc(LABEL_PLAIN[r.label] || r.label || "?")}”)</span>`;
+    return r.action_correct ? `<span class="ok">✓ Right next step</span>${sameLabel}` : r.unsafe ? '<span class="no">✗ Unsafe step</span>' : `<span class="no">✗ Different step</span>${sameLabel}`;
+  };
+  const card = (id, why, quote, label, kind) => { const r = res[id], good = r && (kind === "draft" ? r.grounded : r.action_correct);
+    return `<div class="ccase ${r ? (good ? "pass" : "diff") : ""}"><div>${tag(label, "acc")}</div>${quote ? `<div class="q" title="${esc(quote)}">${esc(clip(quote))}</div>` : ""}<div class="why">${esc(why)}</div><div class="res">${status(id, kind)}</div></div>`; };
+  const groups = CASE_GROUPS.map(([action, ids]) => { const [title, , icon] = REPLY_PLAIN[action];
+    return `<div class="cgrp"><span aria-hidden="true">${icon}</span> Should end as: ${esc(title)} <span class="d">· ${ids.length} case${ids.length > 1 ? "s" : ""}</span></div>
+      <div class="cgrid">${ids.map(id => { const c = byId[id]; return c ? card(id, CASE_WHY[id], c.input.reply_text, LABEL_PLAIN[c.expected.label] || c.expected.label, "reply") : ""; }).join("")}</div>`; }).join("");
+  const drafts = ["EV-G080", "EV-G081", "EV-G082", "EV-G083"].filter(id => byId[id]);
+  out.innerHTML = groups + `<div class="cgrp"><span aria-hidden="true">✉️</span> Email opening line <span class="d">· ${drafts.length} cases · may the AI use these facts?</span></div>
+    <div class="cgrid">${drafts.map(id => { const c = byId[id], n = c.input.facts.length;
+      return card(id, DRAFT_WHY[id], "", `${n} fact${n === 1 ? "" : "s"} offered · ${c.expected.usable_fact_ids.length} allowed`, "draft"); }).join("")}</div>
+    <p class="d" style="margin:8px 0 0">The label on each card is what a person said the reply is. The <b>Should end as</b> heading is the next step the rules must reach. Results appear after you run the live eval, or from the last saved run.</p>`;
+}
 
 function renderEval() {
   const e = LIVE.eval, out = $("#evalOut");
@@ -901,6 +971,7 @@ function renderEval() {
     `${e.complete ? "Last run" : "Partial run (interrupted)"}: ${e.payload.ran_at} · ${e.payload.model}`;
   $("#dlEval").classList.toggle("hidden", !(e && !e.running && e.out.length));
   out.innerHTML = e ? evalTable(e.out) : "";
+  renderCaseGrid();
 }
 
 function evalPayload(out) {
@@ -935,6 +1006,7 @@ function bindEvals() {
     a.href = URL.createObjectURL(new Blob([JSON.stringify(p, null, 2)], { type: "application/json" }));
     a.download = `live-eval-${p.ran_at.replace(/[:-]/g, "")}.json`; a.click();
   };
+  load("cases").then(c => { CASES_CACHE = c; renderCaseGrid(); });
   renderEval();
 }
 
