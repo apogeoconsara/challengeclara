@@ -37,7 +37,7 @@
   "signal_cap": 3,
   "size_sweet_spot": [
     51,
-    1000
+    null
   ],
   "size_edge_fraction": 0.5,
   "signal_fact_types": [

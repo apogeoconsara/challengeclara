@@ -952,7 +952,7 @@ function outcomeActions(ov) {
   return A;
 }
 function whySentence(e) {
-  const size = { ideal: `a right-sized company (${e.employees} employees)`, edge: `a company at the edge of the ideal size (${e.employees} employees)`, below: "a very small company", unknown: "a company of unknown size" }[e.size];
+  const size = { ideal: `a company of the right size or larger (${e.employees} employees)`, edge: `a smaller company (${e.employees} employees)`, below: "a very small company", unknown: "a company of unknown size" }[e.size];
   const sig = e.n_signals ? `${e.n_signals} growth signal${e.n_signals > 1 ? "s" : ""}${e.signals.length ? ` (${e.signals[0].replace(/\.$/, "")})` : ""}` : "no growth signals";
   return `${size[0].toUpperCase() + size.slice(1)}, ${sig}${e.pain ? ", likely handling payments manually" : ""}.`;
 }
@@ -1214,7 +1214,7 @@ function bindPriority() {
   // B opens on the official proposal, so the comparison shows its effect at once; once weights are edited, B shows the edits.
   if (!PRI.b) PRI.b = Object.keys(store.get(WKEY) || {}).length ? "draft" : (ov.config.versions.find(v => v.status === "proposed") || { id: "draft" }).id;
   $("#priRules").innerHTML =
-    factorRow("size", "1. Company size", "Does it look like Clara's sweet spot? Full points for 51 to 1,000 employees, half for 11 to 50 or over 1,000, none if smaller or unknown.", w, 100) +
+    factorRow("size", "1. Company size", "Does it look like Clara's sweet spot? Full points from 51 employees up, half for 11 to 50, none if smaller or unknown.", w, 100) +
     factorRow("pain", "2. Likely payment pain", "Public facts suggest payments or expenses are handled by hand. It is an inference, not confirmed by the company.", w, 100) +
     factorRow("signal_each", "3. Growth signals", `Hiring, expansion, funding or international activity found in public facts. Each signal earns these points, up to ${ov.config.signal_cap} signals.`, w, 50) +
     `<div class="frow total"><div class="ftext"><b>Highest possible score</b><div class="d">The three rows added up (3 signals counted).</div></div><div class="fin"><b id="priMax"></b></div><div></div></div>

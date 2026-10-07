@@ -55,8 +55,8 @@ After changing the engine or the data, regenerate the page JSON: tests fail when
 ## Terms (keep them consistent everywhere: page, docs, code comments)
 
 - **Outreach email**: any email the engine drafts for a `contact` decision. It is step 1 (a **first email**) or step 2 to 4
-  (a **follow-up email**), depending on how many automated emails the company already got. Of the 5,702 prepared in the
-  50k world, 3,059 are first emails and 2,643 are follow-ups. Never call all of them "first emails".
+  (a **follow-up email**), depending on how many automated emails the company already got. Of the 5,897 prepared in the
+  50k world, 3,161 are first emails and 2,736 are follow-ups. Never call all of them "first emails".
 - **Nurture**: the slow track for eligible but weaker-fit companies. It sends no email and calls no model; it only records the
   enrolment. Do not call it a "follow-up", which is reserved for step 2 to 4 emails.
 - Only steps 1 and 3 have an opening line the AI may write (and only when a verified fact exists); steps 2 and 4 are fixed text.
