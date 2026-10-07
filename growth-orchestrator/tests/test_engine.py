@@ -23,7 +23,7 @@ ROOT = Path(__file__).resolve().parent.parent
 SAMPLE = ROOT / "data" / "seed" / "sample"
 AS_OF = parse("2026-10-01T16:00:00Z")
 GOLDEN = load_golden()
-# These tests check what happens AFTER a first email is approved (retries, windows, duplicates, races), so a harness
+# These tests check what happens AFTER an outreach email is approved (retries, windows, duplicates, races), so a harness
 # approves each held draft on the spot. The default engine, with nobody approving, is tested in test_approval_gate.py.
 HARNESS = AutoApprover("scenario harness (test)")
 FIELDS = ["action", "handling", "best_contact_id", "wait_until", "route_to_ae_id", "route_reason", "final_action",

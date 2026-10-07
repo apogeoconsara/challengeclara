@@ -225,7 +225,7 @@ const VIEWS = {
         <div class="impact"><div style="width:${100 * B.auto / ov.n_accounts}%;background:var(--good)"></div><div style="width:${100 * B.people / ov.n_accounts}%;background:var(--warn)"></div><div style="width:${100 * B.blocked / ov.n_accounts}%;background:var(--bad)"></div></div>
         <div class="grid g3">
           <div><div class="impact-num" style="color:var(--good)">${fmt(B.auto)}</div><b>Decided and prepared automatically (${(100 * B.auto / ov.n_accounts).toFixed(0)}%)</b>
-            <div class="d"><b>Nothing has been sent.</b> The system decides and prepares; sending is a separate step that needs human approval. ${fmt(A.contact)} first outreach emails prepared automatically, pending human approval before sending. Also ${fmt(A.nurture || 0)} enrolled in nurture, ${fmt(A.wait)} on hold, ${fmt(A.enrich)} data lookups.</div></div>
+            <div class="d"><b>Nothing has been sent.</b> The system decides and prepares; sending is a separate step that needs human approval. ${fmt(A.contact)} outreach emails prepared automatically${A.contact === ap.total_prepared ? ` (${fmt(ap.by_step["1"])} first emails and ${fmt(ap.follow_ups)} follow-ups)` : ""}, pending human approval before sending. Also ${fmt(A.nurture || 0)} enrolled in nurture, ${fmt(A.wait)} on hold, ${fmt(A.enrich)} data lookups.</div></div>
           <div><div class="impact-num" style="color:var(--warn)">${fmt(B.people)}</div><b>Needs a person (${(100 * B.people / ov.n_accounts).toFixed(0)}%)</b>
             <div class="d">${fmt(A.handoff_ae)} go to a sales exec and ${fmt(A.escalate_human)} need a reviewer: conflicting records, former customers, duplicates.</div></div>
           <div><div class="impact-num" style="color:var(--bad)">${fmt(B.blocked)}</div><b>Blocked (${(100 * B.blocked / ov.n_accounts).toFixed(0)}%)</b>
@@ -324,7 +324,7 @@ const VIEWS = {
     const ov = await load("overview"); await load("scoring_compare");
     return `<h1>Account Prioritization</h1>
       <p class="lede">Every company that passed the safety checks gets a score out of ${maxScore(ov, weights(ov.config))}. The score answers one question: is this company worth a
-      <b>personal first email</b> (drafted, not sent) now, or should it join a <b>slow automatic follow-up (nurture)</b> until it shows more promise?</p>
+      <b>personal outreach email</b> (a first email or a follow-up; drafted, not sent) now, or should it join the <b>slow nurture track</b> (no email for now) until it shows more promise?</p>
       <div class="banner warn">These weights are my assumptions, not Clara's real ideal-customer profile. Change any number and the page recalculates all ${fmt(ov.n_accounts)} companies.
       Your edits are a simulation on this page; the engine uses the version marked "used by the engine".</div>
       <h2>1. How points are earned</h2><div class="card" id="priRules"></div>
@@ -497,7 +497,7 @@ const VIEWS = {
       confident, well-formed, quote-backed wrong label on an ambiguous reply. Validation cannot catch that; this is why the live eval,
       the confidence threshold and 100% human review of AI-driven handoffs at launch exist.</div>
       <div class="card" id="autonomy" style="margin-top:12px"><h3>What must be true before the AI acts on its own</h3>
-        <p class="d" style="margin:0 0 6px">Today a person reviews every AI-driven handoff and approves every first email. None of the steps below has happened yet.</p>
+        <p class="d" style="margin:0 0 6px">Today a person reviews every AI-driven handoff and approves every outreach email. None of the steps below has happened yet.</p>
         <ul class="why">
           <li><b>Measured on Clara's real replies:</b> at least 300 replies labelled by people; 95% precision or better on every label that would act automatically; zero unsafe actions.</li>
           <li><b>Shadow mode first:</b> the AI labels, people act, and the two are compared for at least 4 weeks.</li>
@@ -633,7 +633,7 @@ function diagram() {
     ${box(190, 20, 170, 92, "Intake", ["schema + type check", "dedupe: delivery / key / content", "stale + dead-letter"], "#F4F7FF")}
     ${box(390, 20, 170, 92, "State (SQLite)", ["accounts · contacts · opps", "suppression · touches · facts", "versioned per account"])}
     ${box(590, 20, 190, 92, "Rules engine", ["eligibility + next best action", "routing to AE (no AI)", "send window + caps"], "#F4F7FF")}
-    ${box(810, 20, 240, 92, "Score and track", ["priority score, versioned", "tier A / B: first email prepared", "tier C: nurture (no email, no AI)"], "#F4F7FF")}
+    ${box(810, 20, 240, 92, "Score and track", ["priority score, versioned", "tier A / B: email prepared", "tier C: nurture (no email, no AI)"], "#F4F7FF")}
     ${box(810, 150, 240, 104, "LLM (real model)", ["reply → label + extraction", "copy from usable facts only", "forced tool call, JSON schema"], "#F5F0FF", "#C9B8F5")}
     ${box(590, 150, 190, 104, "Validators", ["schema · quotes · dates", "opt-out guard · injection", "confidence ≥ 0.75 · claims"], "#F5F0FF", "#C9B8F5")}
     ${box(390, 150, 170, 104, "Approval queue", ["a person approves the", "prepared email before", "anything is sent (design)"], "#FBF1DE", "#EDD5A8")}
@@ -884,7 +884,7 @@ function tierModel(ov, w = weights(ov.config)) {
   list.sort((x, y) => y.s.score - x.s.score || (x.id < y.id ? -1 : 1));
   return { w, T, list, blockedA };
 }
-// What the engine ends up doing: eligible accounts split into a drafted first email (A, B) and nurture (C).
+// What the engine ends up doing: eligible accounts split into a drafted outreach email (A, B) and nurture (C).
 function outcomeActions(ov) {
   const { T } = tierModel(ov), A = { ...ov.actions };
   if (ov.config.gate_enabled) { A.nurture = T.C.ready; A.contact = T.A.ready + T.B.ready; }
@@ -901,7 +901,7 @@ function plainKey(k) {
     reconcile_before_retry: "Checked what already happened before retrying", dead_letter: "Parked: could not be processed", dead_letter_and_alert: "Parked with an alert",
     poll_then_escalate: "Waited for a result, then sent to a person", ignore_duplicate: "Duplicate ignored", dedupe_by_content: "Duplicate by content ignored",
     process_and_reconcile: "Late event: earlier decision reconciled", defer_to_send_window: "Scheduled for the next send window",
-    contact: "First email drafted", nurture: "Slow follow-up (nurture)", wait: "On hold", handoff_ae: "Handed to a sales exec", escalate_human: "A person decides",
+    contact: "Outreach email drafted", nurture: "Nurture (slow track)", wait: "On hold", handoff_ae: "Handed to a sales exec", escalate_human: "A person decides",
     suppress: "Do not contact", enrich: "Data lookup", update_state: "State updated only", no_action: "No action", None: "No action",
     reply: "Reply interpretations", draft: "Drafted opening lines", accept: "Accepted", reject_escalate: "Rejected, sent to a person" };
   return m[k] || k;
@@ -1080,7 +1080,7 @@ function bindPriority() {
      <div class="scale" id="priScale"></div>
      <div class="grid g2" style="margin-top:10px">
        <div><label class="small" for="w_tier_b">Standard starts at</label><input type="number" id="w_tier_b" data-w="tier_b" min="0" max="200" value="${w.tier_b}">
-         <div class="d">Below this score the company goes to nurture: no first email drafted and no AI cost.</div></div>
+         <div class="d">Below this score the company goes to nurture: no email drafted and no AI cost.</div></div>
        <div><label class="small" for="w_tier_a">Top priority starts at</label><input type="number" id="w_tier_a" data-w="tier_a" min="0" max="200" value="${w.tier_a}">
          <div class="d">A label for now: Top priority gets the same personal email as Standard. It leaves room to treat the best accounts differently later.</div></div></div>
      <p style="margin:12px 0 0"><button class="btn ghost" id="wReset">Back to the engine's version</button></p>`;
@@ -1111,7 +1111,7 @@ function renderPriority() {
   const vers = allVersions(ov), va = vers.find(v => v.id === PRI.a) || vers[0], base = tierModel(ov, va.weights), cmp = va.id !== "draft";
   const delta = t => { const d = model.T[t].ready - base.T[t].ready; return cmp && d ? `<span class="${d > 0 ? "up" : "down"}">${d > 0 ? "+" : ""}${fmt(d)} vs ${esc(va.name)}</span>` : ""; };
   const card = (t, what) => `<div class="card kpi big"><div class="v">${fmt(model.T[t].ready)}</div><div class="l"><b>${TIER_NAME[t]}</b> · ${(100 * model.T[t].ready / ready).toFixed(0)}% of the ${fmt(ready)} ready companies<br>${what}<br>${delta(t)}</div></div>`;
-  $("#priOut").innerHTML = `<div class="grid g3">${card("A", "First email drafted, AI-written opening line")}${card("B", "First email drafted, AI-written opening line")}${card("C", "Nurture: slow automatic follow-up, no first email, no AI cost")}</div>
+  $("#priOut").innerHTML = `<div class="grid g3">${card("A", "Outreach email drafted (first or follow-up); the AI may write the opening line")}${card("B", "Outreach email drafted (first or follow-up); the AI may write the opening line")}${card("C", "Nurture: slow track, no email, no AI cost")}</div>
     <div class="card" style="margin-top:12px"><p style="margin:0">Another <b>${fmt(model.blockedA)}</b> companies would score as Top priority but the safety rules block them (customers, opt-outs, open deals…). A high score never overrides the rules.</p></div>
     <h3 style="margin:16px 0 6px">Three real examples with these weights</h3><div class="grid g3">${exRows}</div>`;
   renderVersions(ov, vers, va);
@@ -1142,11 +1142,11 @@ function effectOf(ov, cmp, id, w) {
   const T = tierModel(ov, w).T, ab = T.A.ready + T.B.ready, c = T.C.ready, run = cmp.runs[id];
   if (run) return { measured: true, emails: run.emails_prepared, nurture: run.nurture_enrolled, aiCalls: run.draft_calls + run.reply_calls, aiCost: run.ai_cost_usd, hours: hoursForTiers(ov, ab, c) };
   const base = cmp.runs[ov.config.active_version], baseAB = base.ready_by_tier.A + base.ready_by_tier.B;
-  const emails = base.emails_prepared + (ab - baseAB), draft = base.draft_calls / base.emails_prepared * emails, calls = draft + base.reply_calls;   // every company that leaves nurture gets one first email, as the engine measured
+  const emails = base.emails_prepared + (ab - baseAB), draft = base.draft_calls / base.emails_prepared * emails, calls = draft + base.reply_calls;   // every company that leaves nurture gets one outreach email, as the engine measured
   return { measured: false, emails, nurture: c, aiCalls: calls, aiCost: calls * ov.time.ai_cost_usd_per_call, hours: hoursForTiers(ov, ab, c) };
 }
 const signed = (n, f = fmt) => (n > 0 ? "+" : n < 0 ? "−" : "") + f(Math.abs(n));
-const effectText = e => `${fmt(e.moved)} ready companies change group · ${signed(e.emails)} first emails prepared · ${signed(e.nurture)} to nurture · AI cost ${signed(e.aiCost, x => "USD " + x.toFixed(2))}`;
+const effectText = e => `${fmt(e.moved)} ready companies change group · ${signed(e.emails)} outreach emails prepared · ${signed(e.nurture)} to nurture · AI cost ${signed(e.aiCost, x => "USD " + x.toFixed(2))}`;
 function movers(ov, wa, wb) {
   const out = [];
   for (const g of ov.groups) {
@@ -1190,9 +1190,9 @@ function renderVersions(ov, vers, va) {
       ${["A", "B", "C"].map(r => `<tr><th>${TIER_NAME[r]}</th>${["A", "B", "C"].map(c => cell(r, c)).join("")}</tr>`).join("")}</tbody></table></div></div>
     <div class="card" style="margin-top:12px"><h3>What the change means in practice</h3>
       <div class="tablewrap"><table><thead><tr><th></th><th>A ${eA.measured ? '<span class="tag good">measured</span>' : '<span class="tag warn">estimated</span>'}</th><th>B ${eB.measured ? '<span class="tag good">measured</span>' : '<span class="tag warn">estimated</span>'}</th><th>change</th></tr></thead><tbody>
-        ${row("First emails prepared", eA.emails, eB.emails)}${row("Enrolled in nurture", eA.nurture, eB.nurture)}${row("AI model calls", eA.aiCalls, eB.aiCalls)}
+        ${row("Outreach emails prepared", eA.emails, eB.emails)}${row("Enrolled in nurture", eA.nurture, eB.nurture)}${row("AI model calls", eA.aiCalls, eB.aiCalls)}
         ${row("Estimated AI cost", eA.aiCost, eB.aiCost, x => "USD " + x.toFixed(2))}${row("People hours avoided (my time assumptions)", eA.hours, eB.hours)}</tbody></table></div>
-      <p class="d" style="margin:8px 0 0"><b>Measured</b> means the whole event stream of the ${fmt(ov.n_accounts)} companies ran through the real engine with that version (<span class="mono">${esc(cmp.command)}</span>). <b>Estimated</b> means this page scaled the measured ratios to your weights. More first emails also means a bigger approval queue.</p></div>
+      <p class="d" style="margin:8px 0 0"><b>Measured</b> means the whole event stream of the ${fmt(ov.n_accounts)} companies ran through the real engine with that version (<span class="mono">${esc(cmp.command)}</span>). <b>Estimated</b> means this page scaled the measured ratios to your weights. More outreach emails also means a bigger approval queue.</p></div>
     <div class="card" style="margin-top:12px"><h3>Who changes group</h3>
       ${mv.length ? `<div class="tablewrap"><table><thead><tr><th>company</th><th>with A</th><th>with B</th></tr></thead><tbody>${mv.map(m => `<tr><td><b>${esc(m.e.name)}</b><div class="d">${esc(m.e.country)} · ${m.e.employees ?? "?"} employees</div></td>
         <td>${pointsLine(m.a.parts)} = <b>${m.a.score}</b> ${tag(TIER_NAME[m.a.tier])}</td><td>${pointsLine(m.b.parts)} = <b>${m.b.score}</b> ${tag(TIER_NAME[m.b.tier], m.b.tier === "A" ? "good" : m.b.tier === "B" ? "acc" : "")}</td></tr>`).join("")}</tbody></table></div>

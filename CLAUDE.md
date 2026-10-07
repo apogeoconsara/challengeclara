@@ -39,7 +39,7 @@ Start with `README.md`, `growth-orchestrator/README.md` and `growth-orchestrator
 
 ```bash
 python3 -m generator all --seed 42 --n 50000                 # the 50k world, ~1.5 min, 390 MB, not in git
-python3 -m unittest discover -s tests -t .                   # 161 tests, ~4 min; 5 skip without the 50k world
+python3 -m unittest discover -s tests -t .                   # 166 tests, ~4 min; 5 skip without the 50k world
 python3 -m orchestrator export-web                           # regenerate the page data
 python3 -m orchestrator export-overview                      # ~3.5 min; rewrites overview, operations, approvals, measurement, scoring_compare
 python3 -m orchestrator compare-scoring v1 v2 [--write-web]
@@ -49,9 +49,22 @@ After changing the engine or the data, regenerate the page JSON: tests fail when
 (`tests/js/ui_persistence.test.mjs`) needs playwright-core and Chromium and skips itself without them; CI sets
 `REQUIRE_BROWSER=1` so there it must run.
 
+## Terms (keep them consistent everywhere: page, docs, code comments)
+
+- **Outreach email**: any email the engine drafts for a `contact` decision. It is step 1 (a **first email**) or step 2 to 4
+  (a **follow-up email**), depending on how many automated emails the company already got. Of the 5,702 prepared in the
+  50k world, 3,059 are first emails and 2,643 are follow-ups. Never call all of them "first emails".
+- **Nurture**: the slow track for eligible but weaker-fit companies. It sends no email and calls no model; it only records the
+  enrolment. Do not call it a "follow-up", which is reserved for step 2 to 4 emails.
+- Only steps 1 and 3 have an opening line the AI may write (and only when a verified fact exists); steps 2 and 4 are fixed text.
+
 ## Open items (owner's)
 
 The human review of AI-drafted data and text (start with the demo flows G080, G040-42, G070/72/75, G064-67, G063/66,
-G047-48); the presentation; a monthly spend cap in the Anthropic console; revoking the old keys (Customer.io, OpenAI,
-n8n); what to do with the old repo and site. The first live eval (2026-10-07) is stored in `evals/results/`; it must be
-re-run after any prompt, model or `EV-G0xx` change.
+G047-48); the presentation; what to do with the old repo and site. The old API keys (Customer.io, OpenAI, n8n) are revoked.
+The Anthropic account holds about USD 5 of credit, which is the owner's spend cap: keep auto-reload off and check the
+balance before presenting, because the live demo stops if it reaches 0. The first live eval (2026-10-07) is stored in
+`evals/results/`; it must be re-run after any prompt, model or `EV-G0xx` change.
+
+Open policy decision (not to be changed without the owner): the rules put AE ownership before the 90-day closed-lost cooldown
+(see `docs/DECISION_LOG.md`). It would be validated with Sales/Growth in production.

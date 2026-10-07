@@ -29,6 +29,8 @@ If a business rule changes, change it here, in `oracle.py`, and in the scenario 
 | 11b | …same, but enrichment already attempted twice | escalate_human | ENRICHMENT_EXHAUSTED |
 | 12 | otherwise | contact (best contact) | ELIGIBLE |
 
+*Open policy question:* rule 7 (AE ownership) comes before rule 8 (closed-lost cooldown), so an AE-owned account whose deal just closed lost goes straight back to its AE. The order is kept as is and pinned by a test; whether the cooldown should come first is a decision to validate with Sales and Growth (see `docs/DECISION_LOG.md`).
+
 * **Eligible contact:** `email_status = valid` and not suppressed (contact-level or domain-level). Role inboxes (`finanzas@`),
   free-provider addresses, catch-all, unverified, malformed and missing emails are *not* eligible.
 * **Best contact:** highest function score (finance 5 > procurement/executive 4 > operations 3 > IT 2 > HR 1 > other 0),

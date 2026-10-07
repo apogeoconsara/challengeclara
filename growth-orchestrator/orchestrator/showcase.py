@@ -52,7 +52,7 @@ COORDINATION = [
      "writes": "A decision note, or a task for the sales exec",
      "guard": "One idempotency key per write; retry with the same key; read back before retrying an uncertain result; re-read and re-decide on a version conflict"},
     {"system": "Outreach", "reads": "The decision and the approved template, never the AI's free text",
-     "writes": "The first email: drafted, held as pending approval, and recorded in a simulated log only after a person approves it (nothing is sent)",
+     "writes": "The outreach email (first or follow-up): drafted, held as pending approval, and recorded in a simulated log only after a person approves it (nothing is sent)",
      "guard": "The draft is held until a named person approves it; eligibility is re-checked at approval and again at send time, plus send window, daily cap and suppression. The executor refuses to send anything that was not approved"},
 ]
 CALL_TEXT = {200: "ok", 503: "temporary error", 429: "rate limited, wait and retry", 409: "conflict: the record changed since it was read"}
@@ -153,7 +153,7 @@ def _compose(fid, title, story, label, orch, ev, res, v0, v1, calls=()) -> dict:
             elif e.get("system") == "crm":
                 eff.append("CRM note written" if e.get("kind") == "decision_note" else "Task created for the sales exec")
             elif e.get("system") == "nurture":
-                eff.append("Enrolled in the slow follow-up track")
+                eff.append("Enrolled in the slow nurture track")
         if r.get("cancel_pending_outreach"):
             eff.append("Pending outreach to this contact cancelled")
         if res.action == "suppress" and reply:
@@ -235,7 +235,7 @@ def operations_payload(world: Path = GENERATED) -> dict:
     guard = q("SELECT COUNT(*) FROM ai_calls WHERE violation_codes LIKE '%G001%'")
     retried = sum(1 for r in res if r.handling in ("retry_then_process", "reconcile_before_retry"))
     time = json.loads((SEED_DIR / "time_assumptions.json").read_text(encoding="utf-8"))
-    return {"label": "The full event stream of the 50,000-account world through the real engine, offline fixture model, nothing sent: first emails stop at pending approval.",
+    return {"label": "The full event stream of the 50,000-account world through the real engine, offline fixture model, nothing sent: outreach emails stop at pending approval.",
             "n_accounts": manifest["n_accounts"], "events": len(events), "decided": len(decided),
             "handling": dict(handling), "final_actions": {str(k): v for k, v in final.items()},
             "automated": len(decided) - human, "human": human,
@@ -419,7 +419,7 @@ def scoring_compare_payload(world: Path = GENERATED, versions: list[str] | None 
     """What changing the scoring does, measured by the real engine: every official version runs the same world.
 
     Per version: ready companies by tier (rules + score on every account), then the whole event stream through the engine
-    for outcomes (first emails recorded, nurture enrolments, AI calls and their estimated cost). Per pair: who changes group."""
+    for outcomes (outreach emails prepared, nurture enrolments, AI calls and their estimated cost). Per pair: who changes group."""
     manifest = json.loads((world / "manifest.json").read_text(encoding="utf-8"))
     raw = json.loads((SEED_DIR / "scoring_policy.json").read_text(encoding="utf-8"))
     ids = versions or [v["id"] for v in raw["versions"]]
@@ -460,7 +460,7 @@ def scoring_compare_payload(world: Path = GENERATED, versions: list[str] | None 
 
 
 def scoring_compare_markdown(p: dict) -> str:
-    out = [f"# Scoring comparison on {p['dataset']}", "", p["label"], "", "| version | Top priority | Standard | Nurture | first emails prepared | nurture enrolled | AI calls | est. AI cost |", "|---|---|---|---|---|---|---|---|"]
+    out = [f"# Scoring comparison on {p['dataset']}", "", p["label"], "", "| version | Top priority | Standard | Nurture | outreach emails prepared | nurture enrolled | AI calls | est. AI cost |", "|---|---|---|---|---|---|---|---|"]
     for v in p["versions"]:
         r = p["runs"][v["id"]]
         t = r["ready_by_tier"]
@@ -468,6 +468,6 @@ def scoring_compare_markdown(p: dict) -> str:
     for q in p["pairs"]:
         d = q["delta"]
         out += ["", f"## {q['from']} to {q['to']}: {q['moved']:,} of {q['ready']:,} ready companies change group", "",
-                f"- first emails prepared: {d['emails_prepared']:+,}; nurture enrolled: {d['nurture_enrolled']:+,}; draft AI calls: {d['draft_calls']:+,}; est. AI cost: USD {d['ai_cost_usd']:+,.2f}",
+                f"- outreach emails prepared: {d['emails_prepared']:+,}; nurture enrolled: {d['nurture_enrolled']:+,}; draft AI calls: {d['draft_calls']:+,}; est. AI cost: USD {d['ai_cost_usd']:+,.2f}",
                 "- who moves (rows: " + q['from'] + ", columns: " + q['to'] + "): " + ", ".join(f"{k[0]}→{k[1]} {n:,}" for k, n in sorted(q["matrix"].items()) if k[0] != k[1])]
     return "\n".join(out) + "\n"

@@ -143,7 +143,7 @@ class ScoringCompare(unittest.TestCase):
             self.assertEqual(sum(q["matrix"].values()), q["ready"])
             self.assertEqual(q["moved"], sum(n for k, n in q["matrix"].items() if k[0] != k[1]))
             d = q["delta"]
-            self.assertEqual(d["emails_prepared"], -d["nurture_enrolled"], "a company that leaves nurture gets a first email, and the other way round")
+            self.assertEqual(d["emails_prepared"], -d["nurture_enrolled"], "a company that leaves nurture gets an outreach email, and the other way round")
 
     def test_engine_comparison_on_the_sample_world(self):
         p = showcase.scoring_compare_payload(self.SAMPLE)

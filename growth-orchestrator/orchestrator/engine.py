@@ -237,7 +237,7 @@ class Orchestrator:
         return scoring.score(scoring.features(self._account(aid), facts, self.score_cfg), self.score_cfg)
 
     def _nurture(self, e, r, ctx, tags, d):
-        """Eligible but low priority: no first email and no model call. Only records the enrolment (nothing is sent)."""
+        """Eligible but low priority: no outreach email and no model call. Only records the enrolment (nothing is sent)."""
         tags.append("nurture")
         r.effects.append({"system": "nurture", "kind": "enrolled", "status": "ok", "attempts": 1})
         self.audit.log("nurture_enrolled", **ctx, version=self.score_cfg["version"])
