@@ -149,9 +149,9 @@ class SampleStream(unittest.TestCase):
             h_ok = r.handling == t["expected_handling"] or (t["expected_handling"] == "process" and r.handling not in intake)
             if not h_ok or r.action != t.get("expected_action"):
                 bad.append((t.get("scenario"), e["account_id"], t.get("expected_action"), r.action))
-        # Known, explained divergence: acc_000015's negotiation is closed-lost by an earlier event in the same stream;
-        # the static truth still sees the open deal, the stateful engine (correctly) hands the AE-owned account back.
-        self.assertEqual(bad, [("active_opportunity", "acc_000015", "suppress", "handoff_ae")])
+        # The key is stateful (generator/stateful.py): an account_targeted is judged on the state left by the events delivered
+        # before it, as the engine does. There is no known divergence left on the sample.
+        self.assertEqual(bad, [])
 
     def test_safety_invariants(self):
         sent = [json.loads(a["request"]) | a for a in db.rows(self.conn, "SELECT * FROM actions WHERE kind='email' AND status='succeeded'")]

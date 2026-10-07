@@ -79,6 +79,11 @@ weekly bursts of ~20 minutes, which is what stresses rate limits and queues.
 `truth/` holds labels (`truth_accounts`, `truth_events`, `truth_facts`, `truth_replies`). Only tests and evals may read it.
 A test asserts none of those fields leak into the source tables or event payloads.
 
+`truth_accounts` is a snapshot at the as-of time. `truth_events` is **stateful**: an `account_targeted` that is delivered after an
+event that changed its account (a deal closing lost, an unsubscribe, a hard bounce, an opt-out reply) is judged on the state
+those events left, in delivery order (`generator/stateful.py`). Such rows list the deliveries that changed the state in
+`state_changed_by`; every other row is exactly the snapshot. The policy and its rule order are not touched by this.
+
 ## How the volume is shaped
 
 * **Exact scenario quotas** (not random draws) so rare branches always have enough examples — see the coverage matrix in

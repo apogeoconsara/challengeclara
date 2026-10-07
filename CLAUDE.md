@@ -39,7 +39,7 @@ Start with `README.md`, `growth-orchestrator/README.md` and `growth-orchestrator
 
 ```bash
 python3 -m generator all --seed 42 --n 50000                 # the 50k world, ~1.5 min, 390 MB, not in git
-python3 -m unittest discover -s tests -t .                   # 152 tests, ~4 min; 5 skip without the 50k world
+python3 -m unittest discover -s tests -t .                   # 161 tests, ~4 min; 5 skip without the 50k world
 python3 -m orchestrator export-web                           # regenerate the page data
 python3 -m orchestrator export-overview                      # ~3.5 min; rewrites overview, operations, approvals, measurement, scoring_compare
 python3 -m orchestrator compare-scoring v1 v2 [--write-web]
