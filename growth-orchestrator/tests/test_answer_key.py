@@ -3,7 +3,9 @@
 Three things were fixed in the generator and are pinned here:
   * a typo must not alter the words the validator reads (referral name, month of a date, country / budget / timeline words);
   * an injected calendar conflict is an expected outcome (escalate, never double-book), marked as such in the key;
-  * on a freshly generated world the engine and the key agree on every decision.
+  * on a freshly generated world the engine and the key agree on every decision, including the reason codes, the best
+    contact and the wait date of each account_targeted;
+  * an account that needs enrichment keeps no best contact on its decision; the contact enrichment finds goes to the email.
 
 Run:  python -m unittest discover -s tests -t .
 """
@@ -19,7 +21,7 @@ from unittest import mock
 from generator import build, replies
 from generator.build import build_world
 from generator.export import write_world
-from orchestrator import db
+from orchestrator import db, scenario
 from orchestrator.ai.fixture import FixtureLLM, reply_output
 from orchestrator.engine import Orchestrator
 from orchestrator.timeutil import parse
@@ -97,6 +99,20 @@ class InjectedCalendarConflict(unittest.TestCase):
         self.assertGreater(checked, 0)
 
 
+class EnrichThenContact(unittest.TestCase):
+    def test_the_decision_keeps_its_own_contact_and_the_contact_found_by_enrichment_goes_to_the_email(self):
+        """G074: the account needs enrichment, enrichment finds a contact, the engine decides again and drafts an email.
+        The decision taken on the event has no best contact (the golden says so); the one found afterwards is the recipient."""
+        g = next(x for x in scenario.load_golden() if x["id"] == "G074")
+        orch, results = scenario.run(g)
+        r = results[-1]
+        self.assertEqual((r.action, r.final_action), ("enrich", "contact"))
+        self.assertIsNone(r.best_contact_id)
+        self.assertTrue(r.email and r.email["to"])
+        final = db.one(orch.conn, "SELECT best_contact_id FROM decisions WHERE decided_by='rules:after_execution' ORDER BY decision_id DESC LIMIT 1")
+        self.assertIsNotNone(final["best_contact_id"])
+
+
 class EngineAgreesWithTheKey(unittest.TestCase):
     def test_on_a_fresh_world_every_decision_equals_the_key(self):
         """A world generated now (not the committed sample), run through the real engine in delivery order."""
@@ -114,8 +130,14 @@ class EngineAgreesWithTheKey(unittest.TestCase):
             bad = []
             for e in w.events:
                 r = orch.process(e)
-                if r.action != (truth.get(e.get("delivery_id")) or {}).get("expected_action"):
-                    bad.append((e["type"], e.get("account_id"), r.action, truth[e["delivery_id"]].get("expected_action")))
+                t = truth.get(e.get("delivery_id")) or {}
+                if r.action != t.get("expected_action"):
+                    bad.append((e["type"], e.get("account_id"), "action", r.action, t.get("expected_action")))
+                elif e["type"] == "account_targeted" and t.get("expected_handling") == "process":
+                    got = (sorted(r.reason_codes), r.best_contact_id, r.wait_until)
+                    want = (sorted(t["reason_codes"]), t["best_contact_id"], t["wait_until"])
+                    if got != want:
+                        bad.append((e["type"], e.get("account_id"), "reason codes / best contact / wait date", got, want))
         self.assertEqual(bad, [])
 
 

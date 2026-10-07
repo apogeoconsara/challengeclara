@@ -457,7 +457,8 @@ class Orchestrator:
         self._final(e, r, d.action, d.reason_codes, best_contact_id=d.best_contact_id, wait_until=d.wait_until,
                     route_to_ae_id=d.route_to_ae_id, route_reason=d.route_reason)
         if d.action == "contact":
-            r.best_contact_id = d.best_contact_id
+            # `best_contact_id` stays what it was for the decision taken on this event (none for an enrich decision, as the
+            # goldens declare); the contact found by enrichment is recorded in the final decision and in the email's recipient.
             self._contact_flow(e, r, ctx, tags, decision_id, d.best_contact_id)
         elif d.action == "escalate_human":
             self._review(aid, e["event_id"], d.reason_codes, {})
