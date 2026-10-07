@@ -66,6 +66,12 @@ label.small { font-size: 12px; color: var(--muted); display: block; margin: 8px 
 .email { border: 1px dashed #B9C3DA; border-radius: 8px; padding: 12px; background: #FBFCFE; }
 .email .hdr { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
 .email .body { white-space: pre-wrap; font-size: 13px; }
+.rhero { display: flex; gap: 12px; align-items: center; margin: 6px 0 10px; } .ric { font-size: 26px; width: 48px; height: 48px; border-radius: 12px; background: var(--accent-dim); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.rt { font-family: var(--font-head); font-size: 18px; font-weight: 700; }
+.rnext { background: var(--teal-dim); border: 1px solid #BFE6DA; border-radius: 10px; padding: 10px 14px; margin-bottom: 4px; } .rnext .rd { font-family: var(--font-head); font-size: 20px; font-weight: 700; color: #0B5E4D; margin: 2px 0; }
+.rh { margin: 14px 0 6px; font-size: 12.5px; color: var(--muted); font-weight: 600; text-transform: none; }
+.rchips { display: flex; flex-wrap: wrap; gap: 8px; } .rc { background: var(--panel-2); border-radius: 8px; padding: 6px 10px; display: flex; flex-direction: column; font-size: 13px; }
+.rchecks { display: grid; gap: 4px; font-size: 13px; }
 .cmp td:first-child { color: var(--muted); width: 190px; }
 .ok { color: var(--good); font-weight: 600; } .no { color: var(--bad); font-weight: 600; }
 svg text { font-family: var(--font-body); }
@@ -729,20 +735,58 @@ async function fn(body) {
   return j;
 }
 
+const REPLY_PLAIN = {
+  wait: ["On hold", "Not the right moment. The system holds the account and checks it again by itself.", "⏳"],
+  handoff_ae: ["Pass to a sales rep", "The prospect shows real interest, so a person from sales takes over.", "🤝"],
+  escalate_human: ["A person decides", "The case needs human judgement, so it goes to the review queue.", "👤"],
+  suppress: ["Stop contacting", "The prospect asked not to be contacted, so everything pending for that contact is cancelled.", "🛑"],
+  enrich: ["Find the right contact", "The reply points to someone else, so the system looks for that person first.", "🔎"],
+  no_action: ["Nothing to do", "An automatic message, so no action is needed.", "✓"],
+};
+const LABEL_PLAIN = { interested: "Interested", not_now: "Not now", out_of_office: "Out of office", wrong_person: "Wrong person", unsubscribe: "Asks to stop", objection: "Objection",
+  info_request: "Asks for information", mixed_signals: "Mixed signals", ambiguous: "Unclear", auto_reply: "Automatic reply", hostile: "Hostile", prompt_injection: "Tries to trick the AI", empty_or_truncated: "Empty or cut off" };
+const niceDate = d => new Date(d + "T12:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
+// Same rule as the engine (engine.py, action "wait"): the date the reply states, otherwise 7 days after it. Shown here so the demo makes the follow-up visible.
+function nextCheck(j) {
+  const fu = j.extracted && j.extracted.follow_up_date, base = j.received_date;
+  if (fu && /^\d{4}-\d{2}-\d{2}$/.test(fu)) return { date: fu, why: "the date the prospect gave" };
+  if (!base) return null;
+  const d = new Date(base + "T12:00:00Z"); d.setUTCDate(d.getUTCDate() + 7);
+  return { date: d.toISOString().slice(0, 10), why: "no date was given, so the default of 7 days applies" };
+}
+
 function renderReply(j) {
   const raw = (j.attempts || []).map((a, i) => `<div class="d">Attempt ${i + 1} · ${esc(a.model)} · ${a.latency_ms} ms · ${a.input_tokens}+${a.output_tokens} tokens · ${tag(a.verdict)} ${a.codes.map(c => tag(c, "warn")).join("")}</div><pre>${esc(a.raw)}</pre>`).join("");
+  const [title, sentence, icon] = REPLY_PLAIN[j.action] || [j.action, "", "•"], x = j.extracted || {}, q = x.qualification || {};
+  const nc = j.action === "wait" ? nextCheck(j) : null;
+  const understood = [
+    j.label ? ["Type of reply", `${LABEL_PLAIN[j.label] || j.label}${j.confidence != null ? ` (${Math.round(j.confidence * 100)}% sure)` : ""}`] : null,
+    x.interest_level && x.interest_level !== "unclear" ? ["Interest", x.interest_level] : null,
+    x.follow_up_date ? ["Date given", niceDate(x.follow_up_date)] : null,
+    x.referred_contact ? ["Points to", x.referred_contact.name || x.referred_contact.email || "another person"] : null,
+    q.team_size ? ["Team size", q.team_size] : null, q.current_solution ? ["Today they use", q.current_solution] : null,
+    q.timeline_months ? ["Wants it within", `${q.timeline_months} months`] : null, (q.countries || []).length ? ["Countries", q.countries.join(", ")] : null,
+    (q.pain_points || []).length ? ["Pain points", q.pain_points.join(", ")] : null,
+  ].filter(Boolean);
+  const ok = j.verdict === "accept";
   return `<h3>Result</h3>
-    <div>${act(j.action)} ${(j.reason_codes || []).map(c => tag(c)).join("")} ${j.needs_human_review ? tag("human review", "warn") : ""}</div>
-    <table class="cmp" style="margin-top:8px">
-      <tr><td>label (model)</td><td>${esc(j.label ?? "—")} ${j.confidence != null ? `(${j.confidence})` : ""}</td></tr>
-      <tr><td>validator verdict</td><td>${tag(j.verdict)} ${(j.violation_codes || []).map(c => tag(c, "warn")).join("")}</td></tr>
-      <tr><td>action (rules)</td><td>${esc(j.action)} — account state: ${esc(j.crm_state)}</td></tr>
-      <tr><td>extracted</td><td><pre>${J(j.extracted)}</pre></td></tr>
-      <tr><td>email sent</td><td>${j.email_sent ? "yes" : "no — this function cannot send email"}</td></tr>
-    </table>
-    <details open><summary>Raw model output</summary>${raw || '<div class="d">No model call (empty reply or model unavailable).</div>'}</details>
-    <div class="d" style="margin-top:6px">Codes: V006 quote not in the reply · V007 invented referral · V008 invented/past date · V009 invented qualification ·
-    V010 model's suggested action overridden · V011 low confidence · V012 injection missed · G001 opt-out guard.</div>`;
+    <div class="rhero"><div class="ric" aria-hidden="true">${icon}</div><div><div class="rt">${esc(title)}</div><div class="d">${esc(sentence)}</div></div></div>
+    ${nc ? `<div class="rnext"><div class="d">Next check</div><div class="rd">📅 ${esc(niceDate(nc.date))}</div><div class="d">${esc(nc.why)}. Pending emails for this contact are cancelled meanwhile.</div></div>` : ""}
+    ${understood.length ? `<h4 class="rh">What the AI understood</h4><div class="rchips">${understood.map(([k, v]) => `<div class="rc"><span class="d">${esc(k)}</span><b>${esc(String(v))}</b></div>`).join("")}</div>` : ""}
+    <h4 class="rh">Safety checks</h4>
+    <div class="rchecks"><div>${ok ? "✅" : "⚠️"} Rules checked the AI's answer: <b>${ok ? "accepted" : esc(j.verdict || "needs review")}</b>${j.needs_human_review ? ` ${tag("human review", "warn")}` : ""}</div>
+      <div>✅ The action was chosen by rules, not by the AI (account state: ${esc(j.crm_state)})</div>
+      <div>${j.email_sent ? "⚠️ An email was sent" : "✅ No email sent: this function cannot send email"}</div></div>
+    <details style="margin-top:12px"><summary>Technical details</summary>
+      <table class="cmp" style="margin-top:8px">
+        <tr><td>action (rules)</td><td>${act(j.action)} ${(j.reason_codes || []).map(c => tag(c)).join("")}</td></tr>
+        <tr><td>label (model)</td><td>${esc(j.label ?? "—")} ${j.confidence != null ? `(${j.confidence})` : ""}</td></tr>
+        <tr><td>validator verdict</td><td>${tag(j.verdict)} ${(j.violation_codes || []).map(c => tag(c, "warn")).join("")}</td></tr>
+        <tr><td>extracted</td><td><pre>${J(j.extracted)}</pre></td></tr>
+      </table>
+      <h4 class="rh">Raw model output</h4>${raw || '<div class="d">No model call (empty reply or model unavailable).</div>'}
+      <div class="d" style="margin-top:6px">Codes: V006 quote not in the reply · V007 invented referral · V008 invented/past date · V009 invented qualification ·
+      V010 model's suggested action overridden · V011 low confidence · V012 injection missed · G001 opt-out guard.</div></details>`;
 }
 
 function renderDraft(j) {

@@ -122,4 +122,15 @@ assert.match(await text("#priVer"), /change group/);
 assert.doesNotMatch(await text("#priVer"), /\b0 of [\d,]+ ready companies/, "B opened on equal edits instead of the proposal");
 assert.match(await text("#priVer"), /Change log/);
 
+// 11. Live demo: a "wait" result shows the next check date (the stated date, or 7 days after the reply) with the technical detail folded away
+const reply = extra => ({ task: "reply", model: "m", crm_state: "prospect", received_date: "2026-10-01", label: "not_now", confidence: 0.95, verdict: "accept", violation_codes: [], action: "wait",
+  reason_codes: [], email_sent: false, attempts: [], extracted: { interest_level: "medium", follow_up_date: "2026-11-15", referred_contact: null, qualification: {}, ...extra } });
+let replyBody = reply({});
+await page.route("**/.netlify/functions/**", r => r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(r.request().postData()?.includes('"reply"') ? replyBody : { configured: true, model: "m" }) }));
+await goSec("aisafety", "live"); await page.click("#runReply"); await page.waitForSelector(".rnext");
+assert.match(await text(".rnext"), /15 November 2026/);
+replyBody = reply({ follow_up_date: null }); await page.click("#runReply"); await page.waitForTimeout(400);
+assert.match(await text(".rnext"), /8 October 2026[\s\S]*default of 7 days/);
+assert.equal(await page.$eval("#replyOut details", e => e.open), false, "technical details should start folded");
+
 await browser.close(); server.close();
