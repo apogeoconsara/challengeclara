@@ -34,6 +34,7 @@ SIMULATED = ("Recorded run of the real engine. The model's answer is a SIMULATED
 
 # (flow id, title, one-line story, golden scenario, event index, label, group)
 FLOWS = [
+    ("F0", "A new target gets an outreach email", "The draft waits as pending approval, a scripted demo reviewer approves it, and only then it lands in the simulated log. Nothing is sent.", "G040", 0, RECORDED),
     ("F1", "A prospect says they are interested", "The happy path: the reply is read, checked, and the account goes to a sales exec.", "G068", 0, RECORDED),
     ("F2", "\"I'm interested, but don't email me again\"", "The model reads the interest. The rules read the opt-out. The rules win.", "G064", 0, SIMULATED),
     ("F3", "The same webhook arrives twice", "The second delivery is recognised and ignored: no second email.", "G040", 1, RECORDED),
