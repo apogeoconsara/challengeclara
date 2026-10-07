@@ -54,12 +54,14 @@ the generic approved template.
 
 ## Evals (`orchestrator/evals.py`, results in `evals/results/`)
 
-- **Live suite** — 18 core cases (14 replies incl. injection, mixed signals, ambiguity, trap numbers; 4 grounding cases)
-  through the production path. Scores: label and action accuracy, unsafe actions (must be 0), field-level extraction
+- **Live suite** — 18 cases: 14 replies (10 core + 4 extended, incl. injection, mixed signals, ambiguity, trap
+  numbers) and 4 grounding cases, through the production path. Scores: label and action accuracy, unsafe actions (must be 0), field-level extraction
   accuracy, grounding of drafts, latency, tokens. Run: `ANTHROPIC_API_KEY=… python -m orchestrator eval --live`, or the
   "Run the live eval" button on the page.
-- **Recorded suite** — 220 outputs (good + 17 failure variants) through the validators only: 220/220 judged as expected;
-  1 unsafe output survives by design of the test set (see the decision log's biggest risk).
+- **Recorded suite** — 220 outputs (18 good, 202 defective: malformed, hallucinated, injected, overconfident …) through
+  the validators only: 220/220 judged as the reference validator expects.
+  Two wrong-but-plausible outputs pass by design of the test set: a wrong label with a real quote and high confidence
+  (`EV-R-AMB-03`, counted as unsafe; see the decision log's biggest risk) and a wrong team size (`EV-R-INT-18`).
 
 ## Before giving the AI more autonomy
 

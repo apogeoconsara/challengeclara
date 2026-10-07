@@ -8,7 +8,7 @@
 // POST {task: "status"}
 // POST {task: "reply", reply_text, crm_state?, company?, received_date?}
 // POST {task: "draft", case_id, facts?}           facts: optional edited facts for that case's account (max 5)
-// POST {task: "eval_case", case_id}               one of the 18 core eval cases, scored
+// POST {task: "eval_case", case_id}               one of the 18 live eval cases, scored
 import { ORCH } from "./_orchestrator_prompts.mjs";
 import { CASES } from "./_orchestrator_cases.mjs";
 import { composeDraft, interpretReply } from "./_orchestrator_ai.mjs";

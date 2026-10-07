@@ -1,6 +1,7 @@
 # Decision log
 
-The four questions the challenge asks, then the smaller calls that shaped the build.
+The four questions the challenge asks, how the system adapts if an assumption changes, then the smaller calls that
+shaped the build.
 
 ## Something I deliberately did not build
 
@@ -37,14 +38,30 @@ The same tradeoff shows in personalization: no usable fact → the generic appro
 ## The biggest production risk
 
 **A confident, well-formed, wrong interpretation.** Validation catches malformed, unsupported, invented and injected
-outputs (219/220 recorded failure modes), but a reply that is genuinely ambiguous can still get a plausible label with
-a real quote and high confidence (`EV-R-AMB-03:wrong_but_valid_overconfident` passes validation and would hand an
+outputs (all 220 recorded outputs are judged as expected), but a reply that is genuinely ambiguous can still get a
+plausible label with a real quote and high confidence (`EV-R-AMB-03:wrong_but_valid_overconfident` passes validation and would hand an
 unclear lead to an AE). Mitigations: label-level human review at launch (100% of AI-driven handoffs), the live eval
 suite as a release gate on every prompt/model change, per-label precision monitoring from reviewer corrections, and
 an autonomy rollback switch. See [AI.md](AI.md#before-giving-the-ai-more-autonomy).
 
 Second risk: **deliverability and compliance drift** — caps, windows and footers are assumptions in
 `send_policy.json` and must be replaced with Clara's real rules before anything is sent.
+
+## If an assumption changes
+
+Policy numbers are configuration, not code, so most changes are a config edit plus a re-run of the tests and of
+`compare-scoring` / `export-overview` to see who changes group. The engine reads `data/seed/decision_policy.json` and
+`send_policy.json`; the data generator and its independent oracle read `generator/config.py`, so both move together.
+
+| if this changes | what I would touch | how I would check it |
+|---|---|---|
+| cool-down after outreach goes from 14 to 30 days | `recent_outreach_days` in `decision_policy.json` and `RECENT_OUTREACH_DAYS` in `generator/config.py` | `G010` (last touch 14 days + 1 hour → eligible) flips to waiting, so the boundary goldens `G009`/`G010` get new dates; oracle agreement and the 89 goldens re-run |
+| volume grows 10× (500k accounts a month) | queue + workers with per-account ordering, Postgres instead of SQLite (see [PRODUCTION.md](PRODUCTION.md#scale)); the logic does not change | `generator build --n 500000`, then queue depth and `api_limits` in `send_policy.json` |
+| sending is allowed for real | an ESP behind the existing executor (idempotency key per send), the approval step built for real, Clara's caps and footers in `send_policy.json` | shadow mode first, then the experiment with a small treatment share |
+| a second channel (e.g. WhatsApp) | `channel`, templates and opt-out rules per channel | an opt-out on one channel must suppress the other: a new golden |
+| the AI may no longer act on its own, or may do more | `ai_autonomy` in `send_policy.json` (human sampling, confidence threshold) | the opt-out guard is already deterministic; the live eval as a release gate |
+| the CRM or enrichment provider becomes unreliable | retry budget, circuit breaker per provider, dead-letter + alert | failure goldens `G070`–`G078`, `G110`–`G117` |
+| SDR capacity doubles | nothing in the system; the control arm reaches more accounts | the incremental pipeline shrinks in the worked example; the measurement design stays the same |
 
 ## Smaller decisions
 

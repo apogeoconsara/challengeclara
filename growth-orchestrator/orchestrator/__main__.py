@@ -3,7 +3,7 @@
   python -m orchestrator demo [--flow D1] [--live]   run the demo flows through the engine and print each step
   python -m orchestrator stream                      replay the 561-delivery sample stream and summarise
   python -m orchestrator eval --recorded             validators vs 220 recorded model outputs (no model call)
-  python -m orchestrator eval --live                 the 18 core cases against the real model (needs ANTHROPIC_API_KEY)
+  python -m orchestrator eval --live                 the 18 live eval cases against the real model (needs ANTHROPIC_API_KEY)
   python -m orchestrator serve [--port 8080]         local webhook receiver (POST /webhook), mock systems only
   python -m orchestrator export-web                  regenerate the data and prompts used by the Netlify page
   python -m orchestrator export-overview             summarise all 50k accounts for the page (needs data/generated)

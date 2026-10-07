@@ -1,6 +1,6 @@
 # Clara challenge — Growth Orchestration System
 
-This repository and its Netlify site (https://clara-growth-agent-demo.netlify.app) are dedicated to the Clara
+This repository and its Netlify site (https://growth-orchestration-system.netlify.app) are dedicated to the Clara
 **Growth Orchestration System** challenge:
 
 ```

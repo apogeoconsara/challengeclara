@@ -4,7 +4,7 @@
                                           trail, mock calls and ledgers (model: offline fixture, labelled as such)
   public/data/stream.json    the 561-delivery sample stream summary
   public/data/evals.json     recorded-suite results (+ the latest live run if one was saved)
-  public/data/cases.json     the 18 core eval cases (inputs + expectations) for the live panel
+  public/data/cases.json     the 18 live eval cases (inputs + expectations) for the live panel
   netlify/functions/_orchestrator_prompts.mjs   prompts, tool schemas, labels and content rules: ONE source (Python)
 
 The page never computes decisions itself; it shows what this code produced. The live panel calls the Netlify function,
