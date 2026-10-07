@@ -36,8 +36,10 @@ jobs:
       - name: Generate the synthetic world
         run: python -m generator all --seed 42 --n 50000
 
+      # Only the line naming the Python version may differ (the generator records it in two files).
       - name: The seed reproduces the committed artefacts exactly
-        run: git diff --exit-code
+        run: |
+          git diff --exit-code -I '"python": "' -I '· python `'
 
       - name: Run the tests
         env:
