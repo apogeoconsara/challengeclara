@@ -52,6 +52,7 @@ th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line
 th { font-weight: 600; color: var(--muted); font-size: 12px; }
 tr.click { cursor: pointer; } tr.click:hover td { background: var(--panel-2); }
 .tablewrap { overflow-x: auto; }
+.tablewrap th, .tablewrap td { overflow-wrap: normal; }   /* cells scroll inside the wrapper instead of breaking "18" into "1 8" */
 .btn { background: var(--accent); color: #fff; border: 0; border-radius: 6px; padding: 8px 14px; font-weight: 600; cursor: pointer; font-size: 13px; }
 .btn:disabled { opacity: .5; cursor: default; } .btn.ghost { background: var(--panel); color: var(--accent); border: 1px solid var(--line); }
 .chips button { background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px; font-size: 12px; cursor: pointer; margin: 0 6px 6px 0; }
@@ -266,7 +267,7 @@ const VIEWS = {
         <p class="d" style="margin:8px 0 0">The lift in this simulation comes from <b>coverage</b>: the share of eligible companies reached goes from ${Math.round(100 * ms.coverage.control)}% to ${Math.round(100 * ms.coverage.treatment)}%, while the reply rate per email is assumed lower (${(100 * ms.reply_rate_assumed.treatment).toFixed(1)}% against ${(100 * ms.reply_rate_assumed.control).toFixed(1)}%). If real coverage gains are smaller, the case gets weaker, and the data would show it.</p>
       </div>
       <div class="grid g2" style="margin-top:10px;grid-template-columns:1.5fr 1fr">
-        <div class="card"><h3>Guardrails: any breach pauses the treatment group</h3><div class="tablewrap"><table><thead><tr><th>guardrail</th><th>control</th><th>treatment</th><th>limit</th><th></th></tr></thead><tbody>
+        <div class="card"><h3>Guardrails: breaches pause the treatment group</h3><div class="tablewrap"><table><thead><tr><th>guardrail</th><th>control</th><th>treatment</th><th>limit</th><th></th></tr></thead><tbody>
           ${ms.guardrails.map(g => `<tr><td>${esc(g.name)}</td><td style="white-space:nowrap">${esc(g.control)}</td><td style="white-space:nowrap">${esc(g.treatment)}</td><td class="d" style="white-space:nowrap">${esc(g.limit)}</td><td>${g.status === "ok" ? tag("ok", "good") : tag("breach", "bad")}</td></tr>`).join("")}</tbody></table></div>
           <p class="d" style="margin:6px 0 0">Also required: zero unsafe AI actions, an acceptable review-queue wait, and dead letters under control. ${ms.guardrails.some(g => g.status === "breach") ? "In this simulation one guardrail is breached: that is the plan working, because treatment would pause and be investigated." : ""}</p></div>
         <div class="card"><h3>How long to detect a lift</h3><div class="tablewrap"><table><thead><tr><th>lift in SQL rate</th><th>companies per group</th><th>months at 50,000 a month</th></tr></thead><tbody>
@@ -481,7 +482,7 @@ const VIEWS = {
     return `<h1>Safety &amp; Controls</h1>
       <p class="lede">Two suites, never mixed: the <b>live suite</b> measures the model through the production path; the
       <b>recorded suite</b> measures the safety layer (validators + rules) against 220 deliberately broken and good outputs, with no model call.</p>
-      <h2>Live suite · 18 core cases (14 replies, 4 personalization)</h2>
+      <h2>Live suite · 18 cases (14 replies, 4 personalization)</h2>
       <div class="card"><p>Runs each case through the deployed function one at a time: real model → validator → rules → score against the labels.</p>
         <button class="btn" id="runEval">Run the live eval</button> <button class="btn ghost hidden" id="dlEval">Download results (JSON)</button> <span id="evalProg" class="d"></span>
         <div id="evalOut"></div></div>
@@ -495,7 +496,16 @@ const VIEWS = {
       <div class="banner warn" style="margin-top:12px">The one that survives — <span class="mono">${esc(rec.summary.unsafe_after_validation.join(", "))}</span> — is a
       confident, well-formed, quote-backed wrong label on an ambiguous reply. Validation cannot catch that; this is why the live eval,
       the confidence threshold and 100% human review of AI-driven handoffs at launch exist.</div>
-      <div class="card tablewrap"><table><thead><tr><th>variant</th><th>n</th><th>verdicts</th><th>result</th></tr></thead><tbody>${vrows}</tbody></table></div>`;
+      <div class="card" id="autonomy" style="margin-top:12px"><h3>What must be true before the AI acts on its own</h3>
+        <p class="d" style="margin:0 0 6px">Today a person reviews every AI-driven handoff and approves every first email. None of the steps below has happened yet.</p>
+        <ul class="why">
+          <li><b>Measured on Clara's real replies:</b> at least 300 replies labelled by people; 95% precision or better on every label that would act automatically; zero unsafe actions.</li>
+          <li><b>Shadow mode first:</b> the AI labels, people act, and the two are compared for at least 4 weeks.</li>
+          <li><b>Review sampled down slowly:</b> 100% → 20% → 5% of AI-driven actions, only while reviewers overturn fewer than 2% per label.</li>
+          <li><b>Release gate and kill switch:</b> the live eval runs on every prompt or model change; one switch sends every AI-driven action back to people.</li>
+          <li><b>Sign-offs:</b> legal and brand approve the content rules and each language (only English is approved here); data retention and the provider's data terms are agreed.</li>
+        </ul></div>
+      <div class="card tablewrap" style="margin-top:12px"><table><thead><tr><th>variant</th><th>n</th><th>verdicts</th><th>result</th></tr></thead><tbody>${vrows}</tbody></table></div>`;
   },
 
   async stream() {

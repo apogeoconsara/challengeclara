@@ -2,7 +2,7 @@
 
 Two suites, never mixed up in the results:
 
-  live       the 18 core cases (14 replies + 4 personalization) sent to the REAL model through the production path
+  live       the 18 cases (10 core + 4 extended replies, 4 personalization) sent to the REAL model through the production path
              (prompt -> forced tool call -> validator -> rules). Needs ANTHROPIC_API_KEY. This is the model eval.
   recorded   the 220 recorded outputs (good, malformed, hallucinated, injected, overconfident ...) through the
              validators only. No model is called: this measures the safety layer, not the model.
