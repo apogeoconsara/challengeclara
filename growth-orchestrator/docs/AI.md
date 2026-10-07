@@ -63,6 +63,40 @@ the generic approved template.
   Two wrong-but-plausible outputs pass by design of the test set: a wrong label with a real quote and high confidence
   (`EV-R-AMB-03`, counted as unsafe; see the decision log's biggest risk) and a wrong team size (`EV-R-INT-18`).
 
+### Latest live run (2026-10-07)
+
+Model `claude-haiku-4-5-20251001`, started from the page's "Run the live eval" button, so each case went through the
+Netlify function: one call per case, one run. Files: `evals/results/live-claude-haiku-4-5-20251001-20261007T010623Z.json`
+(the page's download, unmodified), its `.md` summary, and `latest-live.json`, which the page shows as "last saved live run".
+
+| 14 replies + 4 drafts | first live run | this run |
+|---|---|---|
+| label accuracy | 14/14 | 14/14 |
+| action accuracy | 11/14 | 14/14 |
+| unsafe actions | 0 | 0 |
+| field extraction | not recorded | 116/126 (92%) |
+| drafts grounded | 4/4 | 4/4 |
+| errors | not recorded | 0 |
+
+The first run was made earlier in the previous repository and is not stored here, so its column is the figures noted at the
+time. Which change closed the three action misses (the prompt, `EV-G082`, or the rules) was not isolated.
+
+What the numbers do and do not say:
+
+- **Not an independent test.** The 18 cases were used to tune the prompt. This shows the prompt still passes them; it says
+  little about unseen replies. The 300 human-labelled real replies in the list below remain the real test.
+- **One run.** No repeats, so the variance between runs is unknown.
+- **Action accuracy mostly measures the rules.** The label decides the action through the label map. In 7 of the 14 reply
+  cases the model's own suggested action differed from the one the rules chose (code `V010`); it was ignored, as designed.
+- **Field misses, 10 of 126:** `interest_level` 6, `current_solution` 2, `pain_points` 1, `budget_signal` 1. None changed an action.
+- **Drafts: only one of the two cases where personalization was possible was personalized.** `EV-G080` cites a fact.
+  `EV-G081` and `EV-G083` have no usable facts, so they are generic and the model is not called. `EV-G082` has one usable
+  fact (a mobile app launch) next to two traps (another company's expansion, a headcount that contradicts the CRM); the
+  model wrote the generic text. That is safe, and it also means 4/4 grounded counts generic drafts as grounded.
+- **The known risk is not closed.** `EV-R-AMB-03` came back as `ambiguous` with confidence 0.65 and escalated, but the
+  recorded overconfident variant of the same case still passes validation (see the decision log).
+- **Latency** 1.1 to 3.0 seconds per call (mean 2.2 s). The page's output has no token counts; the command line run records them.
+
 ## Before giving the AI more autonomy
 
 1. **Measured accuracy on Clara's real replies**: ≥ 300 human-labelled replies across labels and countries; per-label

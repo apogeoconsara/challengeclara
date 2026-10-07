@@ -478,7 +478,7 @@ const VIEWS = {
     const byVariant = {};
     for (const c of rec.cases) { (byVariant[c.variant] ||= { n: 0, ok: 0, verdicts: {} }); const b = byVariant[c.variant]; b.n++; b.ok += c.match ? 1 : 0; b.verdicts[c.verdict] = (b.verdicts[c.verdict] || 0) + 1; }
     const vrows = Object.entries(byVariant).map(([v, b]) => `<tr><td class="mono">${esc(v)}</td><td>${b.n}</td><td>${Object.entries(b.verdicts).map(([k, n]) => tag(`${k} ×${n}`)).join("")}</td><td>${b.ok === b.n ? '<span class="ok">as expected</span>' : `<span class="no">${b.ok}/${b.n}</span>`}</td></tr>`).join("");
-    const saved = ev.live ? `<div class="card" style="margin-top:12px"><h3>Last saved live run (${esc(ev.live.model)}, ${esc(ev.live.ran_at)})</h3><pre>${J(ev.live.summary)}</pre></div>` : "";
+    const saved = ev.live ? `<div class="card" style="margin-top:12px"><h3>Last saved live run (${esc(ev.live.model)}, ${esc(ev.live.ran_at)})</h3><p class="d" style="margin:0 0 8px">Real model, one run started from this page. The 18 cases were used to tune the prompt, so this is not an independent test.</p><pre>${J(ev.live.summary)}</pre></div>` : "";
     return `<h1>Safety &amp; Controls</h1>
       <p class="lede">Two suites, never mixed: the <b>live suite</b> measures the model through the production path; the
       <b>recorded suite</b> measures the safety layer (validators + rules) against 220 deliberately broken and good outputs, with no model call.</p>

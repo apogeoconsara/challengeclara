@@ -60,6 +60,21 @@ Code map: `orchestrator/` is the engine (`rules.py` decides, `ai/` proposes and 
 act), `generator/` builds the synthetic world, `../netlify/functions/orchestrator-llm.mjs` is the live AI endpoint (key
 server-side, no email code) and `../public/` is the page.
 
+## AI evaluation
+
+| live eval: 14 replies + 4 drafts | first run | latest (2026-10-07, `claude-haiku-4-5`, from the page) |
+|---|---|---|
+| label accuracy | 14/14 | 14/14 |
+| action accuracy | 11/14 | 14/14 |
+| unsafe actions | 0 | 0 |
+| field extraction | not recorded | 116/126 (92%) |
+| drafts grounded | 4/4 | 4/4 |
+
+One run, and not an independent test: the 18 cases were used to tune the prompt. Only one of the two draft cases where
+personalization was possible was personalized, and the known overconfident-label risk is not closed. Details, files and
+limits: [docs/AI.md](docs/AI.md#latest-live-run-2026-10-07). The recorded suite (220 outputs, validators only, no model)
+is in `evals/results/`.
+
 ## Key decisions and tradeoffs
 
 - **The model proposes, deterministic code decides.** The model labels and extracts; rules choose the action, the AE,

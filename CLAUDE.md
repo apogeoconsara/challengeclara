@@ -48,7 +48,7 @@ After changing the engine or the data, regenerate the page JSON: tests fail when
 
 ## Open items (owner's)
 
-Run the live eval from the site (AI & Safety → Evaluation) and hand over the JSON for `evals/results/`, the README and
-`docs/AI.md`; the human review of AI-drafted data and text (start with the demo flows G080, G040-42, G070/72/75,
-G064-67, G063/66, G047-48); the presentation; a monthly spend cap in the Anthropic console; revoking the old keys
-(Customer.io, OpenAI, n8n); what to do with the old repo and site.
+The human review of AI-drafted data and text (start with the demo flows G080, G040-42, G070/72/75, G064-67, G063/66,
+G047-48); the presentation; a monthly spend cap in the Anthropic console; revoking the old keys (Customer.io, OpenAI,
+n8n); what to do with the old repo and site. The first live eval (2026-10-07) is stored in `evals/results/`; it must be
+re-run after any prompt, model or `EV-G0xx` change.
