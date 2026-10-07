@@ -1,7 +1,7 @@
 """Everyday-language names for actions and reason codes, for the web page. One source; exported to public/data."""
 ACTIONS = {
-    "contact": ["First email drafted", "Passed every check and is worth a personal first email. It is prepared automatically and held until a person approves it. Nothing has been sent: once approved, it is only recorded in a simulated log."],
-    "nurture": ["Slow follow-up (nurture)", "Eligible, but a weak fit for now. No first email and no AI: it joins a slow automatic follow-up and is scored again at the next event."],
+    "contact": ["Outreach email drafted", "Passed every check and is worth a personal email: a first email, or a follow-up if the company already got earlier ones. It is prepared automatically and held until a person approves it. Nothing has been sent: once approved, it is only recorded in a simulated log."],
+    "nurture": ["Nurture (slow track)", "Eligible, but a weak fit for now. No email and no AI: it joins the slow nurture track and is scored again at the next event."],
     "wait": ["On hold", "Not the right moment (recently contacted or recently lost). The system waits and checks again."],
     "suppress": ["Do not contact", "Should not receive outreach (opted out, customer, competitor, open deal or poor fit)."],
     "handoff_ae": ["Hand to a sales exec", "Already has an owner, so it goes to the right sales exec instead of an automatic email."],
@@ -67,7 +67,7 @@ VALIDATION_CODES = {
 # "Can we safely automate it?" for each outcome: the question the challenge asks, answered in one line.
 AUTOMATION = {
     "contact": ["Automate, then approve", "The system decides and prepares the email on its own. A person approves it before anything is sent."],
-    "nurture": ["Automate", "Enrolled in the slow follow-up automatically. No first email, no AI, nothing to approve."],
+    "nurture": ["Automate", "Enrolled in the slow nurture track automatically. No email, no AI, nothing to approve."],
     "wait": ["Automate", "The system holds the account and checks it again by itself."],
     "enrich": ["Automate", "The data lookup runs by itself. Outreach waits for better data."],
     "suppress": ["Automate (it blocks)", "Stopping is safe to automate: the system blocks outreach and nothing is sent."],

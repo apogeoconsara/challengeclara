@@ -20,7 +20,7 @@ suppressed, recently contacted) stay in the denominator of both arms.
 - **Assignment:** stratified by country × employee band × prior touch, deterministic hash within stratum
   (`data/generated/experiment_assignments.jsonl`), 50/50.
 - **Control:** today's process. **Treatment:** the orchestrator, with people on the review queue and on the approval of
-  first emails.
+  outreach emails (first contacts and follow-ups).
 - **Duration:** 8 weeks of targeting + 60-day attribution window; intention-to-treat on all targeted accounts.
 
 ## Metrics

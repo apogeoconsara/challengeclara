@@ -83,6 +83,9 @@ A test asserts none of those fields leak into the source tables or event payload
 event that changed its account (a deal closing lost, an unsubscribe, a hard bounce, an opt-out reply) is judged on the state
 those events left, in delivery order (`generator/stateful.py`). Such rows list the deliveries that changed the state in
 `state_changed_by`; every other row is exactly the snapshot. The policy and its rule order are not touched by this.
+A `meeting_booked` on an account whose calendar is set to fail (`slot_conflict`) is expected to escalate, never double-book, and
+is marked `injected_failure`: handling it is the right outcome, not a mismatch. Reply typos never touch the words the validator
+reads (a referred name, the month of a date, country / budget / timeline words).
 
 ## How the volume is shaped
 

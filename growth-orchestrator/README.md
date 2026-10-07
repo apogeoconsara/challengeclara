@@ -22,7 +22,7 @@ construction, and only after a person approves it.
 
 ```bash
 python3 -m generator all --seed 42 --n 50000     # the 50k synthetic world, ~1.5 min, 390 MB, not in git
-python3 -m unittest discover -s tests -t .       # 161 tests (5 skip without the 50k data)
+python3 -m unittest discover -s tests -t .       # 166 tests (5 skip without the 50k data)
 python3 -m orchestrator demo                     # the demo flows, step by step (offline fixture for AI steps)
 python3 -m orchestrator eval --recorded          # validators vs 220 recorded model outputs, no model call
 

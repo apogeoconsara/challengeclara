@@ -1,6 +1,6 @@
 """No first outreach can execute without a person's approval: Draft -> Pending approval -> Approved -> Mock send.
 
-The default engine has no approver, so every first email stops at `pending_approval`. These tests drive the real engine
+The default engine has no approver, so every outreach email stops at `pending_approval`. These tests drive the real engine
 that way (no AutoApprover) and check the gate from both sides: nothing reaches the mock send before approval, and what
 is approved is re-checked, sent exactly once and attributed to a named reviewer.
 
@@ -35,7 +35,7 @@ AS_OF = parse("2026-10-01T16:00:00Z")
 
 
 def _held(gid):
-    """A fresh engine with NO approver, after the scenario's events: the first email is waiting for a person."""
+    """A fresh engine with NO approver, after the scenario's events: the outreach email is waiting for a person."""
     g = GOLDEN[gid]
     orch = build(g)
     results = [orch.process(e) for e in g["events"]]

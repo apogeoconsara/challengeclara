@@ -1,7 +1,7 @@
 """Account priority score and the audience check. Deterministic, no AI.
 
 The score never decides eligibility: `rules.decide` does. Among eligible accounts it picks the track: tiers A and B get
-a personal first email, tier C goes to nurture (no first email, no model call).
+a personal outreach email (first or follow-up), tier C goes to nurture (no email, no model call).
 The audience check lists every eligibility condition as pass / fail / unknown. Unknown blocks (fail-closed).
 """
 from __future__ import annotations

@@ -49,7 +49,19 @@ def _fmt_date(dt: datetime, lang: str = "en") -> str:
     return f"{MONTHS[dt.month - 1]} {dt.day}"
 
 
-def _typo(text: str, r) -> str:
+# Words the reference validator reads in the reply text: the referral name (V007), the month of a follow-up date (V008), and
+# the country, "budget" and timeline words (V009). A typo on any of them would make a correct extraction "unsupported by
+# the text", so they are never altered.
+_TIMELINE_WORDS = {"month", "months", "next", "quarter", "semester", "within", "year", "budget"}
+
+
+def _protected(ref_name: str) -> set[str]:
+    from .ai_ref import COUNTRY_WORDS            # imported here: ai_ref itself imports this module
+    return ({m.lower() for m in MONTHS} | {w.lower() for w in re.findall(r"[^\W\d_]+", ref_name)} | _TIMELINE_WORDS
+            | {w for ws in COUNTRY_WORDS.values() for w in ws})
+
+
+def _typo(text: str, r, protected: set[str] = frozenset()) -> str:
     words = text.split(" ")
     idx = [i for i, w in enumerate(words)
            if len(re.sub(r"\W", "", w)) >= 5 and not re.search(r"[\d@{<>]", w) and not w.isupper()]
@@ -57,7 +69,9 @@ def _typo(text: str, r) -> str:
         return text
     i = r.choice(idx)
     ch = list(words[i])
-    pos = r.randrange(1, len(ch) - 2)
+    pos = r.randrange(1, len(ch) - 2)           # the random draws are made either way, so nothing else in the world moves
+    if re.sub(r"\W", "", words[i]).lower() in protected:
+        return text
     ch[pos], ch[pos + 1] = ch[pos + 1], ch[pos]
     words[i] = "".join(ch)
     return " ".join(words)
@@ -91,7 +105,7 @@ def render_reply(seed: dict, ctx: dict, r) -> dict:
     text, dates, has_name, has_email = resolve(seed, ctx["occurred"], ctx["ref"])
     # A typo must not alter the information the model has to extract
     if label not in RAW_LABELS and r.random() < 0.12:
-        text = _typo(text, r)
+        text = _typo(text, r, _protected(ctx["ref"][0]))
 
     fmt = {"first": ctx["first"], "full": ctx["full"], "title": ctx["title"], "company": ctx["company"]}
     body = text

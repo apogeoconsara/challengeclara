@@ -26,14 +26,14 @@
     },
     {
       "id": "email",
-      "name": "Research, write and log the first email",
+      "name": "Research, write and log the outreach email",
       "does": "Pick the contact, find a fact to mention, draft, schedule in the right time window",
       "applies_to": "accounts ready to contact",
       "manual_minutes": 18
     },
     {
       "id": "nurture",
-      "name": "Enroll weaker-fit accounts in a slow follow-up",
+      "name": "Enroll weaker-fit accounts in the slow nurture track",
       "does": "Add them to a low-touch track instead of writing them a personal email",
       "applies_to": "accounts routed to nurture",
       "manual_minutes": 3
@@ -55,7 +55,7 @@
     },
     {
       "id": "spot",
-      "name": "Spot-check the first emails",
+      "name": "Spot-check the outreach emails",
       "applies_to": "accounts ready to contact",
       "minutes": 1.5
     }

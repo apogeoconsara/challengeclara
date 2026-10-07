@@ -679,6 +679,7 @@ def _build_events(w, ctx, meta, idx_contacts, touches_by, opps_by):
     counter = 0
     ta = {t["account_id"]: t for t in w.truth_accounts}
     ae_by_id = {ae["ae_id"]: ae for ae in w.aes}
+    calendar_behaviour = {m["account_id"]: m["calendar"] for m in w.mock_behavior}
 
     def add(*args, **kw):
         nonlocal counter
@@ -771,6 +772,11 @@ def _build_events(w, ctx, meta, idx_contacts, touches_by, opps_by):
                      **dict(zip(("route_to_ae_id", "route_reason"), oracle.route_ae(a, contact["language"], w.aes)))})
                 if base[-1]["truth"]["route_to_ae_id"] is None:
                     base[-1]["truth"].update(expected_action="escalate_human", reason_codes=["NO_AE_AVAILABLE"])
+                elif calendar_behaviour.get(aid) == "slot_conflict":
+                    # An injected failure, on purpose: the calendar answers 409 "slot taken" and the contract says never
+                    # double-book, escalate (mock_api_contracts.json, golden G078). Handling it is the expected outcome.
+                    base[-1]["truth"].update(expected_action="escalate_human", reason_codes=["CALENDAR_CONFLICT"],
+                                             injected_failure="calendar_slot_conflict")
         # ---- deterministic provider events (no AI) ----
         if m["scenario"] == "recent_outreach" and not replied and ts:
             u = er.random()
