@@ -343,8 +343,8 @@ const VIEWS = {
   async approvals() {
     const d = await load("approvals");
     return `<h1>Approval Queue</h1>
-      <p class="lede">The system decided and prepared the first outreach emails. Before anything would leave the building, a person approves it. Review the drafts, approve or reject, and every decision is recorded.</p>
-      <div class="banner"><b>Nothing is sent from this page.</b> Approving only records your decision: this prototype has no send path. In production an approved email is re-checked (suppression, consent, send window) at the moment of sending.</div>
+      <p class="lede">The system decided and prepared the outreach emails, first contacts and follow-ups. Before anything would leave the building, a person approves it. Review the drafts, approve or reject, and every decision is recorded.</p>
+      <div class="banner"><b>Nothing is sent from this page.</b> In the engine, every draft here is held as <b>pending approval</b>: it cannot reach the simulated send until a named person approves it. Your decisions on this page stay in this browser, because a static page cannot call the engine. When the engine approves an email it checks again (suppression, consent, send window) and only then records it in the simulated log.</div>
       <div id="apKpi"></div>
       <div class="card" id="apBar"></div>
       <div class="apgrid"><div class="card aplist" id="apList"></div><div class="card" id="apDetail"></div></div>
@@ -372,7 +372,7 @@ const VIEWS = {
     const g = fl.flows.find(f => f.id === "F2").contradiction;
     return `<h1>Live Demo</h1>
       <p class="lede">One event goes in and you can watch every step: what changed, which rule decided, what Claude understood, whether the safety check accepted it, and what was recorded. Takes about a minute.</p>
-      <div class="banner">${esc(fl.label)} The email is only recorded in a simulated log: nothing is ever sent.</div>
+      <div class="banner">${esc(fl.label)} When a flow drafts an email, the engine holds it as pending approval; a scripted reviewer (standing in for a person) approves it, and only then is it recorded in a simulated log. Nothing is ever sent.</div>
       <div class="card hero" id="truth">
         <div class="eyebrow">The moment of truth</div>
         <h2 style="margin:4px 0 10px">What happens when the model and the rules disagree?</h2>
@@ -423,7 +423,7 @@ const VIEWS = {
         ${tile("Unsafe actions prevented", fmt(unsafeTotal), `${fmt(o.unsafe_prevented.ineligible_not_contacted)} outreach attempts blocked or held by the rules, ${fmt(o.unsafe_prevented.late_events_reconciled)} late events reconciled, ${fmt(o.unsafe_prevented.ai_outputs_rejected)} AI outputs rejected`, tag(`${o.unsafe_prevented.opt_out_guard_overrides} opt-out guard overrides in this run`))}
         ${tile("Dead letters", fmt(o.dead_letters), `${pc(o.dead_letters, o.events, 2)} of ${fmt(o.events)} events could not be processed (garbage or retries used up) and were parked with an alert`, stat(deadRate <= 0.015, "target 1.5% or less met", "above 1.5%"))}
         ${tile("Estimated AI cost", "USD " + o.ai.cost_usd.toFixed(2), `${fmt(o.ai.calls)} model calls at an assumed USD ${o.ai.cost_per_call_usd} each: about USD ${(o.ai.cost_usd / (o.n_accounts / 1000)).toFixed(2)} per 1,000 companies`, tag("assumption", "warn"))}
-        ${tile("Real emails sent", "0", `${fmt(o.emails_in_simulated_log)} emails recorded in the simulated log`, tag("by construction", "good"))}
+        ${tile("Real emails sent", "0", `${fmt(o.emails_held_for_approval)} drafts held for approval, ${fmt(o.emails_in_simulated_log)} in the simulated log`, tag("by construction", "good"))}
       </div>
       <p class="d">Targets are my assumptions, not Clara's. They show how each number would be read as an alert.</p>
       <div class="banner warn" style="margin-top:14px"><b>Known risk.</b> ${unsafeAI.length ? `In the recorded safety suite, ${unsafeAI.length} AI output (${esc(unsafeAI.join(", "))}) passes validation although its label is wrong, because it is wrong and confident at the same time. It is the weakest spot, documented in the decision log.` : "The recorded safety suite found no AI output that passes validation unsafely."}</div>
@@ -515,7 +515,7 @@ const VIEWS = {
       instance, as of the snapshot time, including duplicates, garbage, late races, replies and every mock failure mode.</p>
       <div class="grid g4">
         <div class="card kpi"><div class="v">${esc(s.agreement_with_truth)}</div><div class="l">decisions matching the independent truth*</div></div>
-        <div class="card kpi"><div class="v">${s.mock_emails}</div><div class="l">emails written to the mock ledger</div></div>
+        <div class="card kpi"><div class="v">${s.emails_held_for_approval}</div><div class="l">outreach emails held for approval (${s.mock_emails} written to the mock ledger)</div></div>
         <div class="card kpi"><div class="v">${s.review_queue}</div><div class="l">items queued for a human</div></div>
         <div class="card kpi"><div class="v">${s.dead_letters}</div><div class="l">dead letters (garbage + exhausted retries)</div></div>
       </div>
@@ -1004,7 +1004,7 @@ function renderApprovals() {
   if (!view.find(it => it.id === state.apSel)) state.apSel = (view[0] || {}).id;
   const sel = d.items.find(it => it.id === state.apSel);
   $("#apKpi").innerHTML = `<div class="grid g4" style="margin-bottom:12px">
-    <div class="card kpi"><div class="v">${fmt(d.total_prepared)}</div><div class="l">first emails prepared in total (${fmt(d.by_tier.A)} Top priority, ${fmt(d.by_tier.B)} Standard)</div></div>
+    <div class="card kpi"><div class="v">${fmt(d.total_prepared)}</div><div class="l">outreach emails prepared in total: ${fmt(d.by_step["1"])} first emails and ${fmt(d.follow_ups)} follow-ups (${fmt(d.by_tier.A)} Top priority, ${fmt(d.by_tier.B)} Standard)</div></div>
     <div class="card kpi"><div class="v">${d.batch}</div><div class="l">loaded here to review (${d.personalized} with an AI-written opening line)</div></div>
     <div class="card kpi"><div class="v">${st.a} / ${st.r} / ${st.p}</div><div class="l">approved / rejected / pending</div></div>
     <div class="card kpi"><div class="v">${st.a + st.r ? (100 * st.rate).toFixed(0) + "%" : "-"}</div><div class="l">reviewer override rate (rejected of reviewed). The system's quality metric once real.</div></div></div>`;
@@ -1015,12 +1015,12 @@ function renderApprovals() {
     <button class="btn ghost" id="apDl">Download decisions (JSON)</button> <span class="d">Start with approval on every email; relax it by segment once the override rate is low.</span></p>`;
   const tagFor = s => s === "approved" ? tag("approved", "good") : s === "rejected" ? tag("rejected", "bad") : tag("pending");
   $("#apList").innerHTML = view.length ? `<table><tbody>${view.map(it => `<tr class="click ${it.id === state.apSel ? "sel" : ""}" data-apsel="${it.id}"><td><b>${esc(it.name)}</b><div class="d">${esc(it.contact.title || "")} · ${esc(it.country)}</div></td>
-    <td>${tag(TIER_NAME[it.tier], it.tier === "A" ? "good" : "acc")}</td><td>${tagFor(statusOf(it))}</td></tr>`).join("")}</tbody></table>` : '<div class="d">Nothing here. Change the filter above.</div>';
+    <td>${tag(TIER_NAME[it.tier], it.tier === "A" ? "good" : "acc")}${it.step > 1 ? " " + tag("follow-up " + it.step) : ""}</td><td>${tagFor(statusOf(it))}</td></tr>`).join("")}</tbody></table>` : '<div class="d">Nothing here. Change the filter above.</div>';
   if (!sel) { $("#apDetail").innerHTML = '<div class="d">Select an email on the left.</div>'; }
   else {
     const x = dec[sel.id], s = statusOf(sel);
     $("#apDetail").innerHTML = `<h3 style="margin:0">${esc(sel.name)} ${tagFor(s)}</h3><div class="d">${esc(sel.country)} · ${esc(sel.industry)} · ${sel.employees ?? "?"} employees</div>
-      <div class="email" style="margin-top:10px"><div class="hdr">To ${esc(sel.contact.name)} (${esc(sel.contact.title || "")}) · from ${esc(sel.sender)} · <b>prepared, not sent</b></div>
+      <div class="email" style="margin-top:10px"><div class="hdr">To ${esc(sel.contact.name)} (${esc(sel.contact.title || "")}) · from ${esc(sel.sender)} · ${sel.step > 1 ? `<b>follow-up, step ${sel.step}</b>` : "<b>first email</b>"} · <b>held, not sent</b></div>
         <div><b>${esc(sel.subject)}</b></div><div class="body">${apBody(sel)}</div></div>
       <div class="d" style="margin-top:6px">${sel.mode === "personalized" ? '<mark class="ai">Highlighted</mark> is the opening line the AI wrote by restating one verified fact. The rest is the approved template.' : "Generic template: there was no verified fact to mention, so the AI was not used."}</div>
       <h3 style="margin:12px 0 4px">Why this email was prepared</h3>

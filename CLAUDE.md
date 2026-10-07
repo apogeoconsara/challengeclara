@@ -11,7 +11,10 @@ Start with `README.md`, `growth-orchestrator/README.md` and `growth-orchestrator
 
 ## Rules that are not negotiable
 
-1. Never send an email. Email is a simulated log; the Netlify function has no email code.
+1. Never send an email. Email is a simulated log; the Netlify function has no email code. Inside the engine, no outreach email
+   (first or follow-up) reaches even that log without a named person's `approve()`: drafts are held as `pending_approval`, and the
+   executor refuses unapproved sends. Never make `AutoApprover` the engine's default; it exists only for tests and the scenario
+   runs that check what happens after approval, and it must stay labelled as a harness.
 2. Synthetic data only. Real companies must not come back (a test checks this with hash fingerprints; never list real names).
 3. The API key never goes in a file or a commit: only an environment variable on the server or in the owner's terminal.
 4. Do not invent results. If something was not run against the real model, say so. Recorded, simulated and live are always labelled.
@@ -36,7 +39,7 @@ Start with `README.md`, `growth-orchestrator/README.md` and `growth-orchestrator
 
 ```bash
 python3 -m generator all --seed 42 --n 50000                 # the 50k world, ~1.5 min, 390 MB, not in git
-python3 -m unittest discover -s tests -t .                   # 135 tests, ~3.5 min; 5 skip without the 50k world
+python3 -m unittest discover -s tests -t .                   # 152 tests, ~4 min; 5 skip without the 50k world
 python3 -m orchestrator export-web                           # regenerate the page data
 python3 -m orchestrator export-overview                      # ~3.5 min; rewrites overview, operations, approvals, measurement, scoring_compare
 python3 -m orchestrator compare-scoring v1 v2 [--write-web]

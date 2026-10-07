@@ -2,6 +2,9 @@
 
 Outreach is MOCK-ONLY by construction: the only outreach client is MockSystems.send_email, which writes to an
 in-memory ledger. There is no code path that sends a real email.
+
+Outreach (first or follow-up) also needs a person. An email is first HELD (`pending_approval`); only a recorded review (`reviewer` set,
+status `approved`) lets `send_email` reach the mock. Any other call raises ApprovalRequired before touching the provider.
 """
 from __future__ import annotations
 
@@ -13,6 +16,10 @@ from .db import one, rows
 from .mocks import MockSystems, Timeout
 from .retry import Clock, Retrier
 from .timeutil import iso
+
+
+class ApprovalRequired(Exception):
+    """An email was about to be sent without a recorded approval. Fail closed: nothing reaches the provider."""
 
 
 @dataclass
@@ -101,17 +108,37 @@ class Executor:
         return r
 
     # ---- outreach (mock email only) ---------------------------------------------------------------------------------
-    def schedule_email(self, account_id, contact_id, step, decision_id, draft, send_after):
+    def hold_for_approval(self, account_id, contact_id, step, decision_id, draft, send_after, origin=None):
+        """Park a drafted outreach email until a person approves it. Returns (key, created). An existing action under the same
+        key (already held, approved, sent, rejected) is never overwritten: a replay cannot reopen a decided email."""
         key = f"send:{account_id}:{contact_id}:{step}"
-        self._action(key, account_id, contact_id, decision_id, "email", "send", "scheduled",
-                     {"subject": draft.subject, "body": draft.body, "mode": draft.mode, "step": step}, iso(send_after))
-        return key
+        if one(self.conn, "SELECT 1 AS x FROM actions WHERE idempotency_key=?", (key,)):
+            return key, False
+        self._action(key, account_id, contact_id, decision_id, "email", "send", "pending_approval",
+                     {"subject": draft.subject, "body": draft.body, "mode": draft.mode, "step": step,
+                      "claims": getattr(draft, "claims", None) or [], "origin": origin or {}}, send_after)
+        return key, True
+
+    def review(self, key, status, reviewer, note=""):
+        """Record a person's decision on a held email: approved | rejected. Only a held email can be reviewed."""
+        cur = self.conn.execute("UPDATE actions SET status=?, reviewer=?, reviewed_at=?, review_note=?, updated_at=? "
+                                "WHERE idempotency_key=? AND kind='email' AND status='pending_approval'",
+                                (status, reviewer, iso(self.clock.now), note, iso(self.clock.now), key))
+        return cur.rowcount == 1
+
+    def mark_scheduled(self, key, send_after):
+        self.conn.execute("UPDATE actions SET status='scheduled', send_after=?, updated_at=? "
+                          "WHERE idempotency_key=? AND status='approved'", (iso(send_after), iso(self.clock.now), key))
 
     def send_email(self, account, contact, step, decision_id, draft, ctx) -> Exec:
         key = f"send:{account['account_id']}:{contact['contact_id']}:{step}"
-        done = one(self.conn, "SELECT status FROM actions WHERE idempotency_key=?", (key,))
+        done = one(self.conn, "SELECT status, reviewer FROM actions WHERE idempotency_key=?", (key,))
         if done and done["status"] == "succeeded":
             return Exec("ok", ["already_sent"], 0)
+        if not done or not done["reviewer"] or done["status"] not in ("approved", "scheduled"):
+            self.audit.log("send_blocked_no_approval", ctx["account_id"], ctx.get("event_id"), ctx.get("delivery_id"), key=key,
+                           status=done["status"] if done else "no_action")
+            raise ApprovalRequired(key)
         payload = {"to": contact["email"], "subject": draft.subject, "body": draft.body, "mode": draft.mode}
         self._action(key, account["account_id"], contact["contact_id"], decision_id, "email", "send", "in_progress", payload)
         r = self._write("send", lambda: self.mocks.send_email(account["account_id"], key, payload), key, ctx)
@@ -130,7 +157,8 @@ class Executor:
         return r
 
     def cancel_pending(self, account_id, contact_id=None) -> int:
-        q = "UPDATE actions SET status='cancelled', updated_at=? WHERE account_id=? AND status='scheduled'"
+        q = ("UPDATE actions SET status='cancelled', updated_at=? WHERE account_id=? AND kind='email' "
+             "AND status IN ('pending_approval','approved','scheduled')")
         p = [iso(self.clock.now), account_id]
         if contact_id:
             q += " AND contact_id=?"; p.append(contact_id)
