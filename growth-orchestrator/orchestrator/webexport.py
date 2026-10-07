@@ -20,6 +20,7 @@ import hashlib
 
 from . import db, evals, plain, scenario, scoring, showcase
 from .ai import prompts
+from .engine import AutoApprover
 from .ai.fixture import FixtureLLM, reply_output
 from .ai.validate import LABEL_ACTION, NEEDS_HUMAN_REVIEW, OPT_OUT_LABELS
 from .engine import SENDERS, Orchestrator
@@ -32,8 +33,13 @@ ROOT = Path(__file__).resolve().parent.parent
 REPO = ROOT.parent
 WEB = REPO / "public" / "data"
 FN = REPO / "netlify" / "functions"
+# Every scenario is run with a harness that approves each held email on the spot, so that what happens AFTER approval
+# (retries, windows, duplicates, races) can be checked scenario by scenario. The engine's default has no approver.
+HARNESS = AutoApprover("scenario harness (not a person)")
 LABEL = ("Recorded run of the real Python engine. The AI steps used the offline fixture (a deterministic stand-in, "
          "not a model); use AI & Safety, Try a reply, to run the real model.")
+RUNS_LABEL = LABEL + (" In these scenario runs a test harness (not a person) approves each held email on the spot, so that "
+                      "what happens after approval can be shown.")
 
 
 def _jsonl(p: Path) -> list[dict]:
@@ -44,7 +50,7 @@ def runs() -> dict:
     flows = json.loads((SEED_DIR / "demo_flows.json").read_text(encoding="utf-8"))["flows"]
     out = []
     for g in scenario.load_golden():
-        orch, results = scenario.run(g)
+        orch, results = scenario.run(g, approver=HARNESS)
         trail = orch.audit.trail()
         out.append({
             "id": g["id"], "title": g["title"], "tags": g["tags"], "notes": g["notes"],
@@ -60,7 +66,7 @@ def runs() -> dict:
             "dead_letters": db.rows(orch.conn, "SELECT delivery_id, reason FROM dead_letters"),
             "actions": db.rows(orch.conn, "SELECT idempotency_key, kind, system, status, attempts, send_after FROM actions"),
         })
-    return {"label": LABEL, "flows": flows, "scenarios": out}
+    return {"label": RUNS_LABEL, "flows": flows, "scenarios": out}
 
 
 def stream() -> dict:
@@ -80,7 +86,7 @@ def stream() -> dict:
             "actions": dict(Counter(str(r.action) for _, r in res)),
             "final_actions": dict(Counter(str(r.final_action) for _, r in res)),
             "agreement_with_truth": f"{agree}/{len(res)}",
-            "mock_emails": len(orch.mocks.ledger["send"]),
+            "mock_emails": len(orch.mocks.ledger["send"]), "emails_held_for_approval": len(orch.pending_approvals()),
             "review_queue": conn.execute("SELECT COUNT(*) FROM review_queue").fetchone()[0],
             "dead_letters": conn.execute("SELECT COUNT(*) FROM dead_letters").fetchone()[0],
             "ai_calls": dict(Counter(f"{r['kind']}:{r['mode']}" for r in db.rows(conn, "SELECT kind, mode FROM ai_calls")))}

@@ -15,7 +15,7 @@ from pathlib import Path
 from orchestrator import db
 from orchestrator.ai.fixture import FixtureLLM, reply_output
 from orchestrator.ai.llm import UnavailableLLM
-from orchestrator.engine import Orchestrator
+from orchestrator.engine import AutoApprover, Orchestrator
 from orchestrator.scenario import build, load_golden, run
 from orchestrator.timeutil import parse
 
@@ -23,6 +23,9 @@ ROOT = Path(__file__).resolve().parent.parent
 SAMPLE = ROOT / "data" / "seed" / "sample"
 AS_OF = parse("2026-10-01T16:00:00Z")
 GOLDEN = load_golden()
+# These tests check what happens AFTER a first email is approved (retries, windows, duplicates, races), so a harness
+# approves each held draft on the spot. The default engine, with nobody approving, is tested in test_approval_gate.py.
+HARNESS = AutoApprover("scenario harness (test)")
 FIELDS = ["action", "handling", "best_contact_id", "wait_until", "route_to_ae_id", "route_reason", "final_action",
           "final_reason_codes", "send_after", "scope", "contact_id", "cancel_pending_outreach", "usable_fact_ids",
           "needs_human_review", "automation_allowed", "extracted"]
@@ -36,7 +39,7 @@ class GoldenThroughEngine(unittest.TestCase):
     def test_every_golden_scenario(self):
         for g in GOLDEN:
             with self.subTest(g["id"]):
-                orch, results = run(g)
+                orch, results = run(g, approver=HARNESS)
                 self.assertEqual(len(results), len(g["expected"]))
                 for i, (r, x) in enumerate(zip(results, g["expected"])):
                     d = r.to_dict()
@@ -52,7 +55,7 @@ class GoldenThroughEngine(unittest.TestCase):
     def test_effect_counts_against_the_mock_ledgers(self):
         for g in GOLDEN:
             x = g["expected"][0]
-            orch, results = run(g)
+            orch, results = run(g, approver=HARNESS)
             led, calls = orch.mocks.ledger, orch.mocks.calls
             tasks = [p for p in led["crm"].values() if p.get("kind") == "ae_handoff_task"]
             with self.subTest(g["id"]):
@@ -90,13 +93,13 @@ class GoldenThroughEngine(unittest.TestCase):
                         row["contact_id"] += suffix
             for e in s["events"]:
                 e["account_id"] += suffix
-            orch, (r,) = run(s)
+            orch, (r,) = run(s, approver=HARNESS)
             self.assertEqual(len(orch.mocks.ledger["send"]), 1, suffix)
             self.assertEqual(r.handling, "reconcile_before_retry")
 
     def test_every_processed_event_is_audited_and_escalations_are_queued(self):
         for g in GOLDEN:
-            orch, results = run(g)
+            orch, results = run(g, approver=HARNESS)
             for r in results:
                 trail = orch.audit.trail(event_id=r.event_id)
                 self.assertTrue(any(t["kind"] == "event_received" for t in trail), g["id"])
@@ -110,7 +113,7 @@ class GoldenThroughEngine(unittest.TestCase):
 class Idempotency(unittest.TestCase):
     def test_replaying_every_delivery_changes_nothing(self):
         for g in GOLDEN:
-            orch = build(g)
+            orch = build(g, approver=HARNESS)
             for e in g["events"]:
                 orch.process(e)
             before = {k: dict(v) for k, v in orch.mocks.ledger.items()}
@@ -136,7 +139,7 @@ class SampleStream(unittest.TestCase):
                                                                             r.get("extracted"))
                    for r in _jsonl(SAMPLE / "truth" / "truth_replies.jsonl") if r["event_id"] in by_id}
         # the truth is computed on the snapshot, so the stream is replayed "as of" the snapshot time
-        cls.orch = Orchestrator(cls.conn, llm=FixtureLLM(answers), as_of=AS_OF)
+        cls.orch = Orchestrator(cls.conn, llm=FixtureLLM(answers), as_of=AS_OF, approver=HARNESS)
         cls.results = [(e, cls.orch.process(e), truth[e["delivery_id"]]) for e in cls.events]
 
     def test_handling_and_action_match_the_truth(self):
@@ -177,7 +180,7 @@ class SampleStream(unittest.TestCase):
 class ScheduledSends(unittest.TestCase):
     def test_deferred_email_is_redecided_and_cancelled_by_a_later_unsubscribe(self):
         g = next(s for s in GOLDEN if s["id"] == "G090")                   # Thursday night: deferred to Friday 09:00
-        orch, (r,) = run(g)
+        orch, (r,) = run(g, approver=HARNESS)
         self.assertEqual(r.email["status"], "scheduled")
         self.assertEqual(orch.mocks.ledger["send"], {})
         unsub = dict(g["events"][0], delivery_id="dlv_g090_u", event_id="evt_g090_u", idempotency_key="key_g090_u",
@@ -189,7 +192,7 @@ class ScheduledSends(unittest.TestCase):
 
     def test_deferred_email_goes_out_once_when_the_window_opens(self):
         g = next(s for s in GOLDEN if s["id"] == "G090")
-        orch, (r,) = run(g)
+        orch, (r,) = run(g, approver=HARNESS)
         self.assertEqual(orch.run_due(parse("2026-10-02T14:59:00Z")), [])
         out = orch.run_due(parse("2026-10-02T15:00:00Z"))
         self.assertEqual([o["status"] for o in out], ["ok"])
@@ -202,7 +205,7 @@ class AIDegradesSafely(unittest.TestCase):
         for g in GOLDEN:
             if not any(e.get("type") == "reply_received" for e in g["events"]):
                 continue
-            orch, results = run(g, llm=UnavailableLLM())
+            orch, results = run(g, llm=UnavailableLLM(), approver=HARNESS)
             for e, r in zip(g["events"], results):
                 if e.get("type") != "reply_received":
                     continue
@@ -213,7 +216,7 @@ class AIDegradesSafely(unittest.TestCase):
 
     def test_without_a_model_outreach_uses_the_generic_template(self):
         g = next(s for s in GOLDEN if s["id"] == "G080")
-        orch, (r,) = run(g, llm=UnavailableLLM())
+        orch, (r,) = run(g, llm=UnavailableLLM(), approver=HARNESS)
         self.assertEqual(r.email["mode"], "generic")
         self.assertNotIn("I saw that", r.email["body"])
 

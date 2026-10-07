@@ -23,7 +23,7 @@ from .engine import SENDERS, Orchestrator
 from .rules import decide
 from .windows import next_send_time
 from .policy import SEED_DIR, Policy
-from .timeutil import parse
+from .timeutil import iso, parse
 
 ROOT = Path(__file__).resolve().parent.parent
 GENERATED = ROOT / "data" / "generated"
@@ -52,8 +52,8 @@ COORDINATION = [
      "writes": "A decision note, or a task for the sales exec",
      "guard": "One idempotency key per write; retry with the same key; read back before retrying an uncertain result; re-read and re-decide on a version conflict"},
     {"system": "Outreach", "reads": "The decision and the approved template, never the AI's free text",
-     "writes": "The first email, recorded in a simulated log (nothing is sent)",
-     "guard": "Eligibility re-checked at send time, send window and daily cap, suppression, and human approval before anything leaves"},
+     "writes": "The first email: drafted, held as pending approval, and recorded in a simulated log only after a person approves it (nothing is sent)",
+     "guard": "The draft is held until a named person approves it; eligibility is re-checked at approval and again at send time, plus send window, daily cap and suppression. The executor refuses to send anything that was not approved"},
 ]
 CALL_TEXT = {200: "ok", 503: "temporary error", 429: "rate limited, wait and retry", 409: "conflict: the record changed since it was read"}
 
@@ -66,13 +66,31 @@ def _stage(sid, name, status, headline, lines=()):
     return {"id": sid, "name": name, "status": status, "headline": headline, "lines": list(lines)}
 
 
+REVIEWER = "demo reviewer (scripted stand-in for a person)"
+
+
+def _settle(orch, ev) -> list[dict]:
+    """The recorded runs include the human step: whatever the engine is holding is approved by a scripted reviewer, which is
+    labelled as such everywhere it shows. Without it the engine would (correctly) stop at `pending_approval`."""
+    return [orch.approve(p["key"], REVIEWER, now=parse(ev["received_at"])) for p in orch.pending_approvals()]
+
+
 def _run(g: dict, idx: int, llm=None):
     orch = scenario.build(g, llm)
     aid = g["events"][0]["account_id"]
     for ev in g["events"][:idx]:
         orch.process(ev)
+        _settle(orch, ev)
     ev, v0, n0 = g["events"][idx], state.version(orch.conn, aid), len(orch.mocks.calls)
     res = orch.process(ev)
+    for out in _settle(orch, ev):
+        res.effects.append({"system": "approval", "kind": "approved", "reviewer": REVIEWER})
+        if out["status"] == "scheduled":
+            res.effects.append({"system": "send", "kind": "email_scheduled", "send_after": out["send_after"]})
+        else:
+            res.effects.append({"system": "send", "kind": "email", "status": "ok" if out["status"] == "sent_mock" else out["status"],
+                                "attempts": out.get("attempts", 1)})
+        res.email["status"] = out["status"]
     return orch, ev, res, v0, state.version(orch.conn, aid), orch.mocks.calls[n0:]
 
 
@@ -126,7 +144,10 @@ def _compose(fid, title, story, label, orch, ev, res, v0, v1, calls=()) -> dict:
             st.append(_stage("validator", "Validator checks", "skipped", "Nothing to validate", []))
         eff = []
         for e in r.get("effects") or []:
-            if e.get("system") == "send":
+            if e.get("system") == "approval":
+                eff.append("Draft held as pending approval: it cannot be sent until a person approves it" if e.get("kind") == "held"
+                           else f'Approved by {e.get("reviewer")}. In this recorded run the reviewer is scripted; in real use it is a person, named in the audit trail')
+            elif e.get("system") == "send":
                 n = e.get("attempts", 1)
                 eff.append("Email recorded in the simulated log" + (f" after {n} attempts: the first call failed with a temporary error and was retried safely" if n > 1 else "") + ". Nothing is sent.")
             elif e.get("system") == "crm":
@@ -214,7 +235,7 @@ def operations_payload(world: Path = GENERATED) -> dict:
     guard = q("SELECT COUNT(*) FROM ai_calls WHERE violation_codes LIKE '%G001%'")
     retried = sum(1 for r in res if r.handling in ("retry_then_process", "reconcile_before_retry"))
     time = json.loads((SEED_DIR / "time_assumptions.json").read_text(encoding="utf-8"))
-    return {"label": "The full event stream of the 50,000-account world through the real engine, offline fixture model, nothing sent.",
+    return {"label": "The full event stream of the 50,000-account world through the real engine, offline fixture model, nothing sent: first emails stop at pending approval.",
             "n_accounts": manifest["n_accounts"], "events": len(events), "decided": len(decided),
             "handling": dict(handling), "final_actions": {str(k): v for k, v in final.items()},
             "automated": len(decided) - human, "human": human,
@@ -227,7 +248,8 @@ def operations_payload(world: Path = GENERATED) -> dict:
                                  "late_events_reconciled": handling["process_and_reconcile"],
                                  "opt_out_guard_overrides": guard,
                                  "ai_outputs_rejected": verdicts.get("reject_retry", 0) + verdicts.get("reject_escalate", 0)},
-            "retried_then_ok": retried, "emails_in_simulated_log": len(orch.mocks.ledger["send"]), "real_emails_sent": 0}
+            "retried_then_ok": retried, "emails_held_for_approval": len(orch.pending_approvals()),
+            "emails_in_simulated_log": len(orch.mocks.ledger["send"]), "real_emails_sent": 0}
 
 
 # ------------------------------------------------------------------------------------------------------------------
@@ -235,10 +257,11 @@ BATCH = 200
 
 
 def approvals_payload(world: Path = GENERATED, batch: int = BATCH) -> dict:
-    """The approval queue: a batch of the prepared first emails (tiers A and B) drawn deterministically from all 50,000 accounts.
+    """The approval queue: a batch of the prepared outreach emails, first or follow-up (tiers A and B), drawn deterministically from all 50,000 accounts.
 
-    The totals are exact for the whole world; the page loads `batch` drafts to review. Drafts are what the engine prepares
-    with the offline stand-in model (it restates the first verified fact exactly); nothing is ever sent."""
+    The totals are exact for the whole world; the page loads `batch` drafts to review. Each draft is held by the real engine
+    as `pending_approval` (written with the offline stand-in model, which restates the first verified fact exactly). The
+    decisions made on the page stay in the browser; releasing a draft in the engine takes `Orchestrator.approve()`."""
     cfg, policy, now = scoring.load_config(), Policy.load(), parse("2026-10-01T16:00:00Z")
     conn = db.connect()
     db.load_world_dir(conn, world)
@@ -246,6 +269,8 @@ def approvals_payload(world: Path = GENERATED, batch: int = BATCH) -> dict:
     for f in db.rows(conn, "SELECT * FROM company_facts ORDER BY fact_id"):
         facts.setdefault(f["account_id"], []).append(f)
     queue = {"A": [], "B": []}
+    touches = Counter(r["account_id"] for r in db.rows(conn, "SELECT account_id FROM outreach_history WHERE sender_type='sequence'"))
+    by_step = Counter()
     for a in db.rows(conn, "SELECT * FROM accounts ORDER BY account_id"):
         d = decide(conn, a["account_id"], now, policy)
         if d.action != "contact":
@@ -254,29 +279,42 @@ def approvals_payload(world: Path = GENERATED, batch: int = BATCH) -> dict:
         sc = scoring.score(feat, cfg)
         if sc["tier"] != "C":
             queue[sc["tier"]].append((a, d, feat, sc))
+            by_step[1 + touches.get(a["account_id"], 0)] += 1       # the email's step in the sequence (the engine uses the same count)
     total = sum(len(v) for v in queue.values())
-    templates, rules, llm = ai_draft.load_templates(), policy.send["content_rules"], FixtureLLM()
     take = {"A": round(batch * len(queue["A"]) / total)}
     take["B"] = batch - take["A"]
-    items = []
+    # The batch is what the REAL engine holds: an account_targeted event goes through it for each picked company, and the
+    # engine drafts the email and parks it as pending approval (no approver is configured, so nothing can be released).
+    orch = Orchestrator(conn, policy, llm=FixtureLLM(), as_of=now)
+    picked = []
     for tier in ("A", "B"):
-        pick = sorted(queue[tier], key=lambda x: hashlib.sha256(x[0]["account_id"].encode()).hexdigest())[: take[tier]]
-        for a, d, feat, sc in pick:
-            contact = db.one(conn, "SELECT * FROM contacts WHERE contact_id=?", (d.best_contact_id,))
-            sender = SENDERS[int(hashlib.sha256(a["account_id"].encode()).hexdigest(), 16) % len(SENDERS)]
-            dr = ai_draft.compose(llm, a, contact, facts.get(a["account_id"], []), 1, sender, now, rules, templates)
-            when = next_send_time(now, a["country"], policy)
-            tz = policy.send["timezones"][a["country"]]
-            local = when + __import__("datetime").timedelta(hours=tz["utc_offset_hours"])
-            items.append({"id": a["account_id"], "name": a["name"], "country": a["country"], "industry": a["industry"],
-                          "employees": a["employee_count"], "tier": sc["tier"], "score": sc["score"], "parts": sc["parts"],
-                          "contact": {"name": f'{contact["first_name"]} {contact["last_name"]}', "title": contact["title"], "email": contact["email"]},
-                          "subject": dr.subject, "body": dr.body, "mode": dr.mode, "claims": [c["text"] for c in dr.claims],
-                          "signals": feat["signals"][:3], "sender": sender,
-                          "window": f'{local.strftime("%a %d %b, %H:%M")} local time ({tz["iana"]})'})
+        picked += [(a, d, feat, sc) for a, d, feat, sc in
+                   sorted(queue[tier], key=lambda x: hashlib.sha256(x[0]["account_id"].encode()).hexdigest())[: take[tier]]]
+    for a, *_ in picked:
+        aid = a["account_id"]
+        orch.process({"delivery_id": f"dlv_aq_{aid}", "event_id": f"evt_aq_{aid}", "idempotency_key": f"aq:{aid}",
+                      "type": "account_targeted", "schema_version": "1.0", "source": "approval_queue_batch",
+                      "account_id": aid, "contact_id": None, "occurred_at": iso(now), "received_at": iso(now),
+                      "payload": {"list_id": "tl_approval_queue", "origin": "target_list"}})
+    held = {p["account_id"]: p for p in orch.pending_approvals()}
+    assert len(held) == len(picked) and not orch.mocks.ledger["send"], "the engine must hold every draft and send none"
+    items = []
+    for a, d, feat, sc in picked:
+        contact = db.one(conn, "SELECT * FROM contacts WHERE contact_id=?", (d.best_contact_id,))
+        p = held[a["account_id"]]
+        sender = SENDERS[int(hashlib.sha256(a["account_id"].encode()).hexdigest(), 16) % len(SENDERS)]
+        tz = policy.send["timezones"][a["country"]]
+        local = parse(p["send_after"]) + __import__("datetime").timedelta(hours=tz["utc_offset_hours"])
+        items.append({"id": a["account_id"], "name": a["name"], "country": a["country"], "industry": a["industry"],
+                      "employees": a["employee_count"], "tier": sc["tier"], "score": sc["score"], "parts": sc["parts"],
+                      "contact": {"name": f'{contact["first_name"]} {contact["last_name"]}', "title": contact["title"], "email": contact["email"]},
+                      "subject": p["subject"], "body": p["body"], "mode": p["mode"], "claims": [c["text"] for c in p["claims"]],
+                      "signals": feat["signals"][:3], "sender": sender, "step": p["step"], "engine_key": p["key"], "engine_status": "pending_approval",
+                      "window": f'{local.strftime("%a %d %b, %H:%M")} local time ({tz["iana"]})'})
     items.sort(key=lambda x: (-x["score"], x["id"]))
-    return {"label": "Computed by the real engine on the 50,000-account world. The page loads a batch to review; nothing is ever sent.",
+    return {"label": "Computed by the real engine on the 50,000-account world. Each draft below is held by the engine as pending approval; decisions on this page stay in your browser and nothing is ever sent.",
             "as_of": "2026-10-01T16:00:00Z", "total_prepared": total, "by_tier": {t: len(v) for t, v in queue.items()},
+            "by_step": {str(k): v for k, v in sorted(by_step.items())}, "follow_ups": total - by_step[1],
             "batch": len(items), "personalized": sum(1 for i in items if i["mode"] == "personalized"), "items": items}
 
 
@@ -405,7 +443,7 @@ def scoring_compare_payload(world: Path = GENERATED, versions: list[str] | None 
         draft, reply = q("SELECT COUNT(*) FROM ai_calls WHERE kind='draft'"), q("SELECT COUNT(*) FROM ai_calls WHERE kind='reply'")
         versions_logged = {json.loads(r[0]).get("version") for r in conn.execute("SELECT detail FROM audit_log WHERE kind='score'")}
         runs[i] = {"ready_by_tier": dict(Counter(tier[i])), "nurture_enrolled": q("SELECT COUNT(*) FROM audit_log WHERE kind='nurture_enrolled'"),
-                   "emails_prepared": q("SELECT COUNT(*) FROM audit_log WHERE kind='draft'"), "emails_in_simulated_log": len(orch.mocks.ledger["send"]), "draft_calls": draft, "reply_calls": reply,
+                   "emails_prepared": q("SELECT COUNT(*) FROM audit_log WHERE kind='draft'"), "emails_held_for_approval": len(orch.pending_approvals()), "draft_calls": draft, "reply_calls": reply,
                    "ai_cost_usd": round((draft + reply) * cost, 2), "versions_in_audit": sorted(v for v in versions_logged if v)}
     pairs = []
     for x in range(len(ids)):

@@ -47,7 +47,7 @@ CREATE TABLE IF NOT EXISTS decisions (decision_id INTEGER PRIMARY KEY AUTOINCREM
   route_to_ae_id TEXT, route_reason TEXT, automation_allowed INTEGER, state_version INTEGER, decided_by TEXT, created_at TEXT);
 CREATE TABLE IF NOT EXISTS actions (action_id INTEGER PRIMARY KEY AUTOINCREMENT, idempotency_key TEXT UNIQUE, account_id TEXT,
   contact_id TEXT, decision_id INTEGER, kind TEXT, system TEXT, status TEXT, attempts INTEGER DEFAULT 0, request TEXT,
-  response TEXT, send_after TEXT, created_at TEXT, updated_at TEXT);
+  response TEXT, send_after TEXT, created_at TEXT, updated_at TEXT, reviewer TEXT, reviewed_at TEXT, review_note TEXT);
 CREATE INDEX IF NOT EXISTS ix_actions_account ON actions(account_id);
 CREATE TABLE IF NOT EXISTS audit_log (id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT, account_id TEXT, event_id TEXT,
   delivery_id TEXT, kind TEXT, detail TEXT);

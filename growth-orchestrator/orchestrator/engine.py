@@ -4,17 +4,19 @@ One webhook delivery goes through `Orchestrator.process(env)`:
   1. intake (ingest.check): duplicates, garbage and stale updates never reach the business logic;
   2. the event updates state (suppression, opportunities, replies, meetings);
   3. deterministic rules decide (rules.decide), or, for replies, the LLM interprets and rules decide the action;
-  4. the executor performs the action against the MOCK systems with idempotency keys, retries and reconciliation;
+  4. the executor performs the action against the MOCK systems with idempotency keys, retries and reconciliation. An outreach
+     email (first or follow-up) is only DRAFTED here: it is held as `pending_approval` and goes out only after a person calls `approve()`;
   5. every step is written to the audit log, and the outcome is returned as an EventResult.
 
-Outreach is mock-only: the executor's only email client is MockSystems.send_email (an in-memory ledger).
+Outreach is mock-only: the executor's only email client is MockSystems.send_email (an in-memory ledger), and the
+executor refuses to call it for an email nobody approved: Draft -> Pending approval -> Approved -> Mock send.
 """
 from __future__ import annotations
 
 import hashlib
 import json
 from dataclasses import asdict, dataclass, field
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 
 from . import ingest, rules, state
 from .ai import draft as ai_draft
@@ -78,9 +80,19 @@ class EventResult:
         return d
 
 
+@dataclass
+class AutoApprover:
+    """Approves every held outreach email on the spot, under a named identity.
+
+    ONLY for harnesses that test what happens after approval (retries, send windows, duplicates, races). The engine's
+    default is no approver at all: an outreach email waits until a person calls `Orchestrator.approve()`."""
+    reviewer: str
+
+
 class Orchestrator:
     def __init__(self, conn, policy: Policy | None = None, llm=None, mocks: MockSystems | None = None, templates=None,
-                 as_of=None, score_version=None):
+                 as_of=None, score_version=None, approver: AutoApprover | None = None):
+        self.approver = approver
         self.conn = conn
         self.as_of = as_of            # replay mode: evaluate every event as of this instant instead of its received_at
         self.policy = policy or Policy.load()
@@ -263,25 +275,31 @@ class Orchestrator:
         if dr.attempts:
             self._log_ai(ctx, "draft", dr.attempts, dr.verdict, dr.codes, dr.mode)
         self.audit.log("draft", **ctx, mode=dr.mode, verdict=dr.verdict, codes=dr.codes, usable_fact_ids=dr.usable_fact_ids)
-        when = next_send_time(now, account["country"], self.policy)
-        sent_today = self._counter(f"sent:{now.date().isoformat()}")
-        if sent_today >= self.policy.daily_cap:
-            when = next_day_window(now, account["country"], self.policy)
-            self.audit.log("daily_cap_reached", **ctx, sent_today=sent_today, cap=self.policy.daily_cap)
+        when = self._send_time(account, now, ctx)
         r.send_after = iso(when) if when > now else iso(now)
-        r.email = {"to": contact["email"], "subject": dr.subject, "body": dr.body, "mode": dr.mode, "step": step}
-        if when > now:
+        r.email = {"to": contact["email"], "subject": dr.subject, "body": dr.body, "mode": dr.mode, "step": step,
+                   "status": "pending_approval"}
+        # Draft -> Pending approval. Nothing below this line can send unless a person (or a test harness) approves.
+        key, created = self.ex.hold_for_approval(aid, contact_id, step, decision_id, dr, r.send_after,
+                                                 origin={"event_id": e["event_id"], "delivery_id": e["delivery_id"]})
+        r.effects.append({"system": "approval", "kind": "held", "key": key, "status": "pending_approval" if created else "already_decided"})
+        self.audit.log("email_pending_approval", **ctx, key=key, send_after=r.send_after, created=created)
+        if not created or self.approver is None:
+            if not created:
+                r.email["status"] = "already_decided"
+            return
+        self.ex.review(key, "approved", self.approver.reviewer, "auto-approved by a test harness")
+        self.audit.log("email_approved", **ctx, key=key, reviewer=self.approver.reviewer)
+        r.effects.append({"system": "approval", "kind": "approved", "reviewer": self.approver.reviewer})
+        kind, x = self._release(key, account, contact, step, dr, decision_id, now, ctx, when)
+        if kind == "scheduled":
             tags.append("deferred")
-            key = self.ex.schedule_email(aid, contact_id, step, decision_id, dr, when)
             r.email["status"] = "scheduled"
             r.effects.append({"system": "send", "kind": "email_scheduled", "key": key, "send_after": iso(when)})
-            self.audit.log("email_scheduled", **ctx, key=key, send_after=iso(when))
             return
-        x = self.ex.send_email(account, contact, step, decision_id, dr, ctx)
         tags += x.tags
         r.email["status"] = {"ok": "sent_mock"}.get(x.status, x.status)
         r.effects.append({"system": "send", "kind": "email", "status": x.status, "attempts": x.attempts})
-        self.audit.log("email_" + x.status, **ctx, attempts=x.attempts, tags=x.tags)
         if x.status == "hard_reject":                 # the address is dead: mark it and decide again on fresh state
             d = rules.decide(self.conn, aid, self.clock.now, self.policy)
             self._final(e, r, d.action, d.reason_codes, best_contact_id=d.best_contact_id)
@@ -289,6 +307,97 @@ class Orchestrator:
                 self._queue_enrichment(e, ctx, "after_hard_reject")
         elif x.status != "ok":
             self._exhausted(e, r, ctx, tags, "SEND_FAILED")
+
+    def _send_time(self, account, now, ctx):
+        """When an approved email may go out: the country's send window, pushed to the next day if the daily cap is spent."""
+        when = next_send_time(now, account["country"], self.policy)
+        sent_today = self._counter(f"sent:{now.date().isoformat()}")
+        if sent_today >= self.policy.daily_cap:
+            when = next_day_window(now, account["country"], self.policy)
+            self.audit.log("daily_cap_reached", **ctx, sent_today=sent_today, cap=self.policy.daily_cap)
+        return when
+
+    def _release(self, key, account, contact, step, dr, decision_id, now, ctx, when=None):
+        """Approved -> waits for its window (`scheduled`) or goes to the mock send now. The only caller of the executor's send."""
+        when = when or self._send_time(account, now, ctx)
+        if when > now:
+            self.ex.mark_scheduled(key, when)
+            self.audit.log("email_scheduled", **ctx, key=key, send_after=iso(when))
+            return "scheduled", None
+        x = self.ex.send_email(account, contact, step, decision_id, dr, ctx)
+        self.audit.log("email_" + x.status, **ctx, attempts=x.attempts, tags=x.tags)
+        return "sent", x
+
+    # ---- human approval ------------------------------------------------------------------------------------------------
+    def _begin(self, now):
+        self.clock = Clock(now)
+        self.audit.clock = self.clock
+        self.ex = Executor(self.conn, self.mocks, self.policy, self.clock, self.audit)
+
+    def pending_approvals(self, limit: int | None = None) -> list[dict]:
+        """Outreach emails (first or follow-up) waiting for a person: the draft, who it is for and when it could go out."""
+        q = "SELECT * FROM actions WHERE kind='email' AND status='pending_approval' ORDER BY action_id"
+        out = []
+        for a in rows(self.conn, q + (f" LIMIT {int(limit)}" if limit else "")):
+            req = json.loads(a["request"])
+            out.append({"key": a["idempotency_key"], "account_id": a["account_id"], "contact_id": a["contact_id"],
+                        "step": req["step"], "subject": req["subject"], "body": req["body"], "mode": req["mode"],
+                        "claims": req.get("claims", []),
+                        "send_after": a["send_after"], "created_at": a["created_at"]})
+        return out
+
+    def approve(self, key, reviewer, now=None, note="") -> dict:
+        """Pending approval -> Approved -> Mock send (or `scheduled` until the send window opens). The reviewer is recorded.
+        Eligibility is decided again now: a suppression, reply or open deal that arrived while the draft waited blocks it."""
+        return self._review_held(key, "approved", reviewer, now, note)
+
+    def reject(self, key, reviewer, reason="", now=None) -> dict:
+        return self._review_held(key, "rejected", reviewer, now, reason)
+
+    def _review_held(self, key, verdict, reviewer, now, note) -> dict:
+        if not isinstance(reviewer, str) or not reviewer.strip():
+            raise ValueError("a reviewer identity is required to approve or reject")
+        self._begin(now or self.as_of or datetime.now(timezone.utc))
+        now = self.clock.now
+        a = one(self.conn, "SELECT * FROM actions WHERE idempotency_key=? AND kind='email' AND system='send'", (key,))
+        if a is None:
+            return {"key": key, "status": "not_found"}
+        if a["status"] != "pending_approval":
+            return {"key": key, "status": "not_pending", "current": a["status"]}
+        req = json.loads(a["request"])
+        origin = req.get("origin") or {}
+        ctx = {"account_id": a["account_id"], "event_id": origin.get("event_id"), "delivery_id": origin.get("delivery_id")}
+        if verdict == "rejected":
+            self.ex.review(key, "rejected", reviewer, note)
+            self.audit.log("email_rejected", **ctx, key=key, reviewer=reviewer, reason=note)
+            self.conn.commit()
+            return {"key": key, "status": "rejected", "reviewer": reviewer}
+        d = rules.decide(self.conn, a["account_id"], now, self.policy)
+        if d.action != "contact" or d.best_contact_id != a["contact_id"]:
+            self.conn.execute("UPDATE actions SET status='cancelled', review_note=?, updated_at=? WHERE idempotency_key=?",
+                              ("not eligible at approval: " + ",".join(d.reason_codes), iso(now), key))
+            self.audit.log("email_approval_blocked", **ctx, key=key, reviewer=reviewer, now_decision=d.action,
+                           reason_codes=d.reason_codes)
+            self.conn.commit()
+            return {"key": key, "status": "cancelled", "now_decision": d.action, "reason_codes": d.reason_codes}
+        self.ex.review(key, "approved", reviewer, note)
+        self.audit.log("email_approved", **ctx, key=key, reviewer=reviewer)
+        account, contact = self._account(a["account_id"]), self._contact(a["contact_id"])
+        dr = ai_draft.DraftResult(req["subject"], req["body"], req["mode"], "approved")
+        kind, x = self._release(key, account, contact, req["step"], dr, a["decision_id"], now, ctx)
+        if kind == "scheduled":
+            out = {"key": key, "status": "scheduled", "reviewer": reviewer,
+                   "send_after": one(self.conn, "SELECT send_after FROM actions WHERE idempotency_key=?", (key,))["send_after"]}
+        else:
+            out = {"key": key, "status": {"ok": "sent_mock"}.get(x.status, x.status), "reviewer": reviewer,
+                   "attempts": x.attempts, "tags": x.tags}
+            if x.status == "hard_reject":
+                self._review(a["account_id"], ctx["event_id"], ["EMAIL_ADDRESS_REJECTED"], {"key": key})
+            elif x.status != "ok":
+                self.audit.log("alert", **ctx, code="SEND_FAILED")
+                self._review(a["account_id"], ctx["event_id"], ["SEND_FAILED"], {"key": key})
+        self.conn.commit()
+        return out
 
     def _counter(self, name) -> int:
         v = self.conn.execute("SELECT value FROM counters WHERE name=?", (name,)).fetchone()
@@ -301,8 +410,9 @@ class Orchestrator:
         self.audit.clock = self.clock
         self.ex = Executor(self.conn, self.mocks, self.policy, self.clock, self.audit)
         out = []
-        for a in rows(self.conn, "SELECT * FROM actions WHERE status='scheduled' AND kind='email' AND send_after<=? "
-                                 "ORDER BY send_after, action_id", (iso(now),)):
+        # only emails a person approved can be scheduled; the reviewer filter makes that explicit here as well
+        for a in rows(self.conn, "SELECT * FROM actions WHERE status='scheduled' AND kind='email' AND reviewer IS NOT NULL "
+                                 "AND send_after<=? ORDER BY send_after, action_id", (iso(now),)):
             ctx = {"account_id": a["account_id"], "event_id": None, "delivery_id": None}
             d = rules.decide(self.conn, a["account_id"], now, self.policy)
             if d.action != "contact" or d.best_contact_id != a["contact_id"]:

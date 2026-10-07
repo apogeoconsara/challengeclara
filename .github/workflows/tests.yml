@@ -44,4 +44,5 @@ jobs:
       - name: Run the tests
         env:
           CHROMIUM_PATH: /usr/bin/google-chrome
+          REQUIRE_BROWSER: "1"   # the browser test must run here, not skip itself
         run: python -m unittest discover -s tests -t .

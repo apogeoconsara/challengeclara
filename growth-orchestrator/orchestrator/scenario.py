@@ -30,7 +30,7 @@ def fixture_for(scenario: dict) -> FixtureLLM:
     return FixtureLLM(answers)
 
 
-def build(scenario: dict, llm=None, policy: Policy | None = None, path=":memory:"):
+def build(scenario: dict, llm=None, policy: Policy | None = None, path=":memory:", approver=None):
     conn = db.connect(path)
     st = scenario["state"]
     db.load_snapshot(conn, {k: v for k, v in st.items() if k not in ("aes", "runtime_state")})
@@ -48,13 +48,15 @@ def build(scenario: dict, llm=None, policy: Policy | None = None, path=":memory:
     conn.commit()
     overrides = {a["account_id"]: dict(scenario.get("mock") or {}) for a in st["accounts"]}
     mocks = MockSystems(conn, overrides)
-    orch = Orchestrator(conn, policy or Policy.load(), llm if llm is not None else fixture_for(scenario), mocks)
+    orch = Orchestrator(conn, policy or Policy.load(), llm if llm is not None else fixture_for(scenario), mocks, approver=approver)
     # golden scenarios test one behaviour each: the low-priority track is off unless the scenario sets "gate": true
     orch.score_cfg = {**orch.score_cfg, "gate_enabled": bool(scenario.get("gate"))}
     return orch
 
 
-def run(scenario: dict, llm=None, policy: Policy | None = None):
-    orch = build(scenario, llm, policy)
+def run(scenario: dict, llm=None, policy: Policy | None = None, approver=None):
+    """`approver=None` is the engine's real behaviour: outreach emails stay pending until a person approves them. Tests of what
+    happens AFTER approval (retries, windows, duplicates) pass an AutoApprover and say so."""
+    orch = build(scenario, llm, policy, approver=approver)
     results = [orch.process(ev) for ev in scenario["events"]]
     return orch, results

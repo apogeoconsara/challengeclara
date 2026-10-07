@@ -11,7 +11,7 @@ Webhook events update persistent account/contact state. Deterministic rules deci
 A real LLM interprets replies (label + extraction) and personalizes copy from verified facts only. Every external call
 goes through idempotency keys, retries and reconciliation against mock CRM, enrichment, calendar and email systems, and
 every step is audited. All data is synthetic and **no email is ever sent**: outreach goes to a mock ledger, by
-construction.
+construction, and only after a person approves it.
 
 - Live page: https://growth-orchestration-system.netlify.app (recorded engine runs, a live AI panel, a live eval button)
 - Docs: [decision log](docs/DECISION_LOG.md) · [AI: scope, validation, autonomy](docs/AI.md) ·
@@ -22,13 +22,13 @@ construction.
 
 ```bash
 python3 -m generator all --seed 42 --n 50000     # the 50k synthetic world, ~1.5 min, 390 MB, not in git
-python3 -m unittest discover -s tests -t .       # 135 tests (5 skip without the 50k data)
+python3 -m unittest discover -s tests -t .       # 152 tests (5 skip without the 50k data)
 python3 -m orchestrator demo                     # the demo flows, step by step (offline fixture for AI steps)
 python3 -m orchestrator eval --recorded          # validators vs 220 recorded model outputs, no model call
 
 export ANTHROPIC_API_KEY=...                     # in your shell only, never in a file
 python3 -m orchestrator eval --live              # core cases against the real model -> evals/results/
-python3 -m orchestrator serve --port 8080        # local webhook receiver: POST /webhook, GET /accounts/<id>
+python3 -m orchestrator serve --port 8080        # local receiver: POST /webhook, GET /accounts/<id>, GET /approvals, POST /approvals/<key>/approve|reject
 ```
 
 `python3 -m orchestrator export-web` and `export-overview` regenerate the page data; `compare-scoring v1 v2` compares
@@ -47,7 +47,7 @@ flowchart LR
   R -- reply text --> L
   L --> V[Validators<br/>schema · quotes · dates · claims<br/>opt-out guard · injection · confidence]
   V -- label --> R
-  V -- grounded copy --> AP[Approval step<br/>a person approves before anything is sent]
+  V -- grounded copy --> AP[Approval gate<br/>held as pending_approval until a named person approves]
   AP --> X[Executor<br/>idempotency keys · backoff<br/>reconcile uncertain outcomes]
   X --> M[Mock systems<br/>CRM · enrichment · calendar<br/>email = simulated log only]
   R --> H[Human review queue]
@@ -60,14 +60,32 @@ Code map: `orchestrator/` is the engine (`rules.py` decides, `ai/` proposes and 
 act), `generator/` builds the synthetic world, `../netlify/functions/orchestrator-llm.mjs` is the live AI endpoint (key
 server-side, no email code) and `../public/` is the page.
 
+## AI evaluation
+
+| live eval: 14 replies + 4 drafts | first run | latest (2026-10-07, `claude-haiku-4-5`, from the page) |
+|---|---|---|
+| label accuracy | 14/14 | 14/14 |
+| action accuracy | 11/14 | 14/14 |
+| unsafe actions | 0 | 0 |
+| field extraction | not recorded | 116/126 (92%) |
+| drafts grounded | 4/4 | 4/4 |
+
+One run, and not an independent test: the 18 cases were used to tune the prompt. Only one of the two draft cases where
+personalization was possible was personalized, and the known overconfident-label risk is not closed. Details, files and
+limits: [docs/AI.md](docs/AI.md#latest-live-run-2026-10-07). The recorded suite (220 outputs, validators only, no model)
+is in `evals/results/`.
+
 ## Key decisions and tradeoffs
 
 - **The model proposes, deterministic code decides.** The model labels and extracts; rules choose the action, the AE,
   the timing and whether anything is sent. Opt-outs are honoured by rules even if the model disagrees or is down.
 - **Safety over automation rate.** Anything uncertain goes to a human queue instead of being guessed.
 - **Exactly-once by idempotency key plus lookup before retry**, so uncertain outcomes never become double sends.
-- **Human approval is a design rule, not a built feature.** The prototype prepares first emails and has no send path;
-  the Approval Queue page only demonstrates the step, with decisions kept in the browser.
+- **No outreach email executes without a person.** The engine drafts and holds every outreach email (first or follow-up)
+  as `pending_approval`; only `approve()` by a named reviewer releases it to the mock send, and the executor refuses
+  anything unapproved (tested: zero sends on the whole sample stream until someone approves). The Approval Queue page shows
+  the reviewer's side, but its decisions stay in the browser: a static page cannot call the engine. There is no reviewer
+  sign-in or production queue.
 - **Recorded, simulated and live are always labelled.** Operations metrics come from running all 55,959 events through
   the engine with an offline stand-in for the model, not a real one.
 

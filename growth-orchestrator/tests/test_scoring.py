@@ -66,11 +66,14 @@ class Nurture(unittest.TestCase):
     def test_strong_account_still_gets_the_email(self):
         orch, (r,) = _run_variant(gate=True, strong=True)
         self.assertEqual((r.action, r.final_action), ("contact", "contact"))
-        self.assertEqual(len(orch.mocks.ledger["send"]), 1)
+        # the strong account is drafted and held for a person; nothing reaches the mock send before approval
+        self.assertEqual((len(orch.pending_approvals()), orch.mocks.ledger["send"]), (1, {}))
+        self.assertEqual(r.email["status"], "pending_approval")
 
     def test_track_is_off_for_scenarios_that_do_not_ask_for_it(self):
         orch, (r,) = _run_variant(gate=False, strong=False)
-        self.assertEqual(len(orch.mocks.ledger["send"]), 1)
+        self.assertEqual(len(orch.pending_approvals()), 1)         # drafted and held: the weak account is not sent to nurture
+        self.assertEqual(orch.mocks.ledger["send"], {})
 
     def test_audit_records_the_score_version(self):
         orch, _ = _run_variant(gate=True, strong=False)
