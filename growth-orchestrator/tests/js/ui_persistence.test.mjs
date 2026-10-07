@@ -92,6 +92,17 @@ assert.equal(await page.inputValue("#w_size"), "30", "Reset demo did not restore
 await go("approvals"); await page.waitForSelector("#apApprove"); assert.match(await text("#apKpi"), /0 \/ 0 \/ 200/, "Reset demo did not clear the approvals");
 
 // 8. with storage blocked the page still keeps your changes while the tab is open, and says so
+// 9. Measuring impact: the replay starts on its own, ends on the simulation's numbers, and survives switching tabs
+await go("run"); await go("overview"); await page.waitForSelector("#miPlay");
+await page.waitForTimeout(4200);                                   // the dots take about 2.4 s to split before the clock moves
+assert.notEqual(await text("#miClock"), "Day 0", "the replay did not start by itself");
+await go("run"); await go("overview"); await page.click("#miSkip");
+assert.ok(await page.$eval("#miResult", e => e.classList.contains("show")), "the comparison is not shown at the end of the replay");
+const ms = JSON.parse(readFileSync(join("public", "data", "measurement.json"), "utf8"));
+assert.equal(await text("#mi_a_p"), "$" + ms.pipeline.control.toLocaleString("en-US"));
+assert.equal(await text("#mi_b_p"), "$" + ms.pipeline.treatment.toLocaleString("en-US"));
+assert.match(await text("#miPlay"), /about USD 20,000 per 1,000 companies/);
+
 const blocked = await browser.newPage({ viewport: { width: 1280, height: 900 } });
 await blocked.addInitScript(() => { Object.defineProperty(window, "localStorage", { get() { throw new Error("blocked"); } }); });
 const berrors = []; blocked.on("pageerror", e => berrors.push(e.message));

@@ -104,6 +104,20 @@ class Measurement(unittest.TestCase):
         self.assertTrue(all(g["status"] in ("ok", "breach") for g in m["guardrails"]))
         self.assertIn("SIMULATED", m["label"])
 
+    def test_guardrails_carry_their_counts_and_an_interval_that_decides_the_state(self):
+        for g in self.m["guardrails"]:
+            self.assertIn(g["evidence"], ("go", "hold", "stop"), g["name"])
+            if "ci_pct" not in g:                      # the ineligible-contact guardrail has a limit of zero events
+                self.assertEqual(g["evidence"], "go" if g["events"]["treatment"] == 0 else "stop")
+                continue
+            lo, hi = g["ci_pct"]
+            self.assertLessEqual(lo, 100 * g["events"]["treatment"] / g["contacted"]["treatment"])
+            self.assertLessEqual(100 * g["events"]["treatment"] / g["contacted"]["treatment"], hi)
+            self.assertEqual(g["evidence"], "go" if hi < g["limit_pct"] else "stop" if lo > g["limit_pct"] else "hold", g["name"])
+        spam = next(g for g in self.m["guardrails"] if g["name"] == "Spam complaint rate")
+        self.assertEqual((spam["status"], spam["evidence"]), ("breach", "hold"),
+                         "a point estimate over the limit with an interval that includes it reads HOLD, not broken")
+
     def test_it_matches_the_worked_example_in_the_reports(self):
         text = (ROOT_DIR / "data/reports/impact_example.md").read_text(encoding="utf-8")
         self.assertIn(f'USD {self.m["pipeline"]["diff"]:,}', text)

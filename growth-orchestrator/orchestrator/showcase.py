@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import copy
 import json
+import math
 from collections import Counter
 from pathlib import Path
 
@@ -320,6 +321,15 @@ def approvals_payload(world: Path = GENERATED, batch: int = BATCH) -> dict:
 
 
 # ------------------------------------------------------------------------------------------------------------------
+def _wilson(k: int, n: int, z: float = 1.96) -> tuple[float, float]:
+    """95% Wilson interval for a rate of k events in n trials."""
+    if n == 0:
+        return 0.0, 1.0
+    p, d = k / n, 1 + z * z / n
+    c, a = p + z * z / (2 * n), z * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n))
+    return (c - a) / d, (c + a) / d
+
+
 def measurement_payload(world: Path = GENERATED, aa_runs: int = 40) -> dict:
     """The measurement plan's worked example as data, from the SIMULATED experiment (assumptions in funnel_assumptions.json)."""
     from generator import impact
@@ -340,9 +350,17 @@ def measurement_payload(world: Path = GENERATED, aa_runs: int = 40) -> dict:
     for name, f, lim in (("Unsubscribe rate", "unsubscribed", g["unsubscribe_rate_max"]), ("Spam complaint rate", "complaint", g["spam_complaint_rate_max"]),
                          ("Hard bounce rate", "hard_bounce", g["hard_bounce_rate_max"])):
         t, c = rate(T, f, "contacted"), rate(C, f, "contacted")
-        guard.append({"name": name, "control": f"{c:.2%}", "treatment": f"{t:.2%}", "limit": f"{lim:.2%} or less", "status": "ok" if t <= lim else "breach"})
+        kt, nt = sum(r[f] for r in T if r["contacted"]), sum(1 for r in T if r["contacted"])
+        kc, nc = sum(r[f] for r in C if r["contacted"]), sum(1 for r in C if r["contacted"])
+        lo_t, hi_t = _wilson(kt, nt)
+        # A single rate is not enough to call a guardrail broken: with few events the 95% interval can include the limit.
+        guard.append({"name": name, "control": f"{c:.2%}", "treatment": f"{t:.2%}", "limit": f"{lim:.2%} or less", "status": "ok" if t <= lim else "breach",
+                      "limit_pct": round(100 * lim, 3), "events": {"control": kc, "treatment": kt}, "contacted": {"control": nc, "treatment": nt},
+                      "ci_pct": [round(100 * lo_t, 3), round(100 * hi_t, 3)],
+                      "evidence": "go" if hi_t < lim else ("stop" if lo_t > lim else "hold")})
     vt, vc = sum(r["violation"] for r in T), sum(r["violation"] for r in C)
-    guard.append({"name": "Contacted an ineligible account", "control": str(vc), "treatment": str(vt), "limit": "0 in treatment", "status": "ok" if vt == 0 else "breach"})
+    guard.append({"name": "Contacted an ineligible account", "control": str(vc), "treatment": str(vt), "limit": "0 in treatment", "status": "ok" if vt == 0 else "breach",
+                  "events": {"control": vc, "treatment": vt}, "evidence": "go" if vt == 0 else "stop"})
     pc = sum(r["sql"] for r in C) / len(C)
     power = [{"lift": f"+{l:.0%}", "per_arm": impact.sample_size_two_proportions(pc, pc * (1 + l)),
               "months": round(impact.sample_size_two_proportions(pc, pc * (1 + l)) / 25_000, 1)} for l in (0.10, 0.25, 0.50, 1.00, 2.00)]

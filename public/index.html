@@ -167,6 +167,29 @@ mark.ai { background: #E8E1FF; color: #3B1FA6; padding: 1px 3px; border-radius: 
 .verdict .d { text-transform: uppercase; letter-spacing: .05em; font-size: 11px; font-weight: 600; }
 .verdict.yes { background: var(--good-dim); border-color: #BFE6CB; } .verdict.approve { background: var(--accent-dim); border-color: #C9D6FB; }
 .verdict.person { background: var(--warn-dim); border-color: #EDD5A8; } .verdict.no { background: var(--bad-dim); border-color: #F3C2C2; }
+
+/* Measuring impact: the replay and the plain-words cards */
+.mi-stepper { display: flex; gap: 6px; flex-wrap: wrap; margin: 0 0 10px; } .mi-stepper span { font-size: 12px; padding: 3px 10px; border-radius: 999px; background: var(--panel-2); color: var(--muted); font-weight: 600; } .mi-stepper span.on { background: var(--accent); color: #fff; }
+.mi-say { min-height: 44px; font-size: 14.5px; margin: 0 0 8px; } .mi-say b { color: var(--accent); }
+.mi-arena { position: relative; height: 300px; border: 1px solid var(--line); border-radius: 10px; background: #FAFBFE; overflow: hidden; }
+.mi-dot { position: absolute; width: 12px; height: 12px; border-radius: 50%; left: 0; top: 0; will-change: transform; }
+.mi-glab { position: absolute; top: 8px; width: 46%; text-align: center; font-size: 12.5px; opacity: 0; transition: opacity .6s; } .mi-glab b { display: block; font: 600 13.5px var(--font-head); } .mi-glab.show { opacity: 1; }
+.mi-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 10px; }
+.mi-cnt { border: 1.5px solid var(--line); border-radius: 10px; padding: 10px 12px; background: #fff; } .mi-cnt.a { background: #F4F5F9; border-color: #8B97B5; } .mi-cnt.b { background: var(--accent-dim); border-color: var(--accent); }
+.mi-cnt h4 { margin: 0 0 6px; font: 600 13px var(--font-head); } .mi-cnt .row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; border-top: 1px solid rgba(0,0,0,.06); padding: 4px 0; } .mi-cnt .row span { font-size: 12.5px; color: var(--muted); } .mi-cnt .row b { font: 700 16px var(--font-head); font-variant-numeric: tabular-nums; } .mi-cnt .row.big b { font-size: 20px; }
+.mi-clock { display: flex; align-items: center; gap: 10px; margin: 10px 0 2px; } .mi-clock .bar2 { flex: 1; height: 10px; border-radius: 5px; background: var(--panel-2); overflow: hidden; position: relative; } .mi-clock .bar2 i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--accent); width: 0; } .mi-clock .t { font: 600 13px var(--font-head); min-width: 96px; text-align: right; }
+.mi-btns { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; } .mi-btn { border: 1px solid var(--accent); background: var(--accent); color: #fff; border-radius: 8px; padding: 7px 14px; font: 600 13px var(--font-head); cursor: pointer; } .mi-btn.ghost { background: #fff; color: var(--accent); }
+.mi-result { display: none; margin-top: 12px; } .mi-result.show { display: block; }
+.mi-rbar { display: grid; grid-template-columns: 120px 1fr 90px; gap: 8px; align-items: center; margin: 6px 0; } .mi-rbar .track { height: 18px; } .mi-rbar b { font: 700 14px var(--font-head); text-align: right; }
+.mi-plain { display: grid; gap: 12px; grid-template-columns: repeat(3, 1fr); margin-top: 8px; }
+.mi-call { background: var(--accent-dim); border: 1px solid #C5D2FB; color: #1E3FA8; border-radius: 8px; padding: 10px 12px; font-size: 13.5px; font-weight: 500; }
+.mi-assump { background: var(--warn-dim); border: 1px solid #EDD5A8; border-radius: 8px; padding: 8px 10px; font-size: 12.5px; color: #7A4E07; margin-top: 8px; }
+.mi-steps3 { display: grid; gap: 10px; grid-template-columns: repeat(3, 1fr); } .mi-st { border-radius: 10px; padding: 10px 12px; border: 1.5px solid; } .mi-st b { display: block; font: 600 13.5px var(--font-head); margin-bottom: 2px; } .mi-st .d { color: inherit; opacity: .85; }
+.mi-st.go { background: var(--good-dim); border-color: #9AD7AE; color: #0F5E2E; } .mi-st.hold { background: var(--warn-dim); border-color: #E3C58A; color: #7A4E07; } .mi-st.stop { background: var(--bad-dim); border-color: #EBA9A9; color: #8E1B1B; }
+.mi-grow { display: grid; grid-template-columns: 150px 1fr 160px; gap: 10px; align-items: center; margin: 6px 0; padding: 6px 8px; border-radius: 8px; } .mi-grow.hold { background: #FFFBF2; outline: 1.5px solid #E3C58A; } .mi-gsvg { width: 100%; height: 46px; }
+.mi-brake { display: grid; grid-template-columns: 1fr 24px 1fr 24px 1fr 24px 1fr; gap: 6px; align-items: stretch; margin-top: 8px; } .mi-box { border: 1.5px solid var(--line); border-radius: 10px; padding: 10px; font-size: 12.5px; background: #fff; } .mi-box b { display: block; font: 600 13px var(--font-head); } .mi-arrow { align-self: center; font-size: 18px; color: var(--muted); text-align: center; }
+.mi-svg { display: block; width: 100%; height: auto; }
+@media (max-width: 760px) { .mi-plain, .mi-cols, .mi-steps3 { grid-template-columns: 1fr; } .mi-rbar { grid-template-columns: 90px 1fr 80px; } .mi-arena { height: 260px; } .mi-grow { grid-template-columns: 1fr; } .mi-brake { grid-template-columns: 1fr; } .mi-arrow { transform: rotate(90deg); } }
 </style>
 </head>
 <body>
@@ -246,35 +269,69 @@ const VIEWS = {
       <h2>What happened to the ${fmt(ov.n_accounts)} companies</h2>
       <div class="card">${ACTION_ORDER.map(k => bar(ov.plain.actions[k][0], A[k] || 0, ov.n_accounts, ACTION_BAR[k], ov.plain.actions[k][1])).join("")}</div>
       <h2>Measuring impact</h2>
-      <p class="lede" style="margin-bottom:10px">The goal is not to send more messages. It is to create <b>more qualified pipeline</b> than the current process, safely. This is how we would find out.</p>
-      <div class="banner warn">${esc(ms.label)}</div>
-      <div class="card">
-        <div class="grid g2">
-          <div><h3>The experiment</h3><ul class="why"><li><b>Unit:</b> a targeted company (companies that share a domain always share a group).</li>
-            <li><b>Control:</b> today's process, with SDRs researching, writing and sending by hand.</li>
-            <li><b>Treatment:</b> this system, with people reviewing what it cannot settle.</li>
-            <li><b>Split:</b> 50/50, balanced by country, size and prior contact. Duration ${ms.design.weeks} weeks plus ${ms.design.attribution_days} days to attribute pipeline.</li></ul></div>
-          <div><h3>The primary metric</h3><div class="d" style="margin-bottom:6px">${esc(ms.primary_metric)}</div>
-            <div class="grid g2" style="margin:8px 0 6px">
-              <div class="ex"><div class="d">Today's process (control)</div><div class="impact-num">USD ${fmt(ms.pipeline.control)}</div></div>
-              <div class="ex"><div class="d">With this system (treatment)</div><div class="impact-num">USD ${fmt(ms.pipeline.treatment)}</div></div></div>
-            <div class="d">Both are per 1,000 targeted companies, over 60 days, and simulated. <b>Pipeline</b> here means the deal value of the leads a sales exec accepted as qualified. Difference: <b>+USD ${fmt(ms.pipeline.diff)}</b>. The real difference could plausibly be anywhere from ${fmt(ms.pipeline.lo)} to +${fmt(ms.pipeline.hi)} (95% interval).</div>
-            ${ms.pipeline.includes_zero ? '<div class="d" style="margin-top:6px"><b>The interval includes zero:</b> one month of 50,000 companies is not enough to call it. That is why the plan also reads leading metrics at week 4 and confirms on pipeline at the end.</div>' : ""}</div></div>
-        <h3 style="margin:14px 0 6px">The funnel, per 1,000 targeted companies (simulated)</h3>
+      <p class="lede" style="margin-bottom:10px">We want to know one thing: <b>does the system create more qualified sales pipeline than today's process?</b> Not more messages. Not more replies. Press play to see how we would find out.</p>
+      <div class="banner warn">${esc(ms.label)} The pacing of the replay is illustrative; the final numbers are the simulation's.</div>
+      <div class="card" id="miPlay">
+        <div class="mi-stepper" id="miStepper"><span>1 · Split at random</span><span>2 · Run for ${ms.design.weeks} weeks</span><span>3 · Wait ${ms.design.attribution_days} days</span><span>4 · Compare</span></div>
+        <p class="mi-say" id="miSay"></p>
+        <div class="mi-arena" id="miArena" aria-hidden="true">
+          <div class="mi-glab" id="miGA" style="left:2%"><b>Group A: today's process</b>People research, write and send by hand</div>
+          <div class="mi-glab" id="miGB" style="left:52%"><b>Group B: the system</b>Rules decide, AI helps, people approve</div>
+        </div>
+        <div class="mi-clock"><div class="bar2"><i id="miBar"></i></div><div class="t" id="miClock">Day 0</div></div>
+        <div class="mi-cols">
+          <div class="mi-cnt a"><h4>Group A · per 1,000 companies</h4>
+            <div class="row"><span>Companies contacted</span><b id="mi_a_c">0</b></div><div class="row"><span>Replies</span><b id="mi_a_r">0</b></div><div class="row"><span>Qualified leads accepted by a sales rep</span><b id="mi_a_s">0</b></div><div class="row big"><span>Qualified pipeline</span><b id="mi_a_p">$0</b></div></div>
+          <div class="mi-cnt b"><h4>Group B · per 1,000 companies</h4>
+            <div class="row"><span>Companies contacted</span><b id="mi_b_c">0</b></div><div class="row"><span>Replies</span><b id="mi_b_r">0</b></div><div class="row"><span>Qualified leads accepted by a sales rep</span><b id="mi_b_s">0</b></div><div class="row big"><span>Qualified pipeline</span><b id="mi_b_p">$0</b></div></div>
+        </div>
+        <div class="mi-btns"><button class="mi-btn" id="miPlayBtn" type="button">&#9654; Play</button><button class="mi-btn ghost" id="miSkip" type="button">Skip to the end</button></div>
+        <div class="mi-result" id="miResult">
+          <h3 style="margin:12px 0 4px">Step 4 · The comparison</h3>
+          <div class="mi-rbar"><span class="d">Group A</span><div class="track"><div class="fill" style="width:${100 * ms.pipeline.control / ms.pipeline.treatment}%;background:#8B97B5"></div></div><b>USD ${fmt(ms.pipeline.control)}</b></div>
+          <div class="mi-rbar"><span class="d">Group B</span><div class="track"><div class="fill" style="width:100%;background:var(--accent)"></div></div><b>USD ${fmt(ms.pipeline.treatment)}</b></div>
+          <p class="d" style="margin:2px 0 8px">Qualified pipeline per 1,000 companies after ${ms.design.attribution_days} days (simulated).</p>
+          <div class="mi-call">In this simulation the system is ahead by about <b>USD ${fmt(Math.round(ms.pipeline.diff / 1000) * 1000)} per 1,000 companies</b>. But the real difference could be anywhere from <b>${ms.pipeline.lo < 0 ? "−" : ""}USD ${fmt(Math.abs(ms.pipeline.lo))} to +USD ${fmt(ms.pipeline.hi)}</b>${ms.pipeline.includes_zero ? ", so one month of 50,000 companies is not enough to be sure. That is why we also read early signals at week 4 and confirm at the end" : ""}.</div>
+          <div class="mi-assump"><b>Honest note.</b> Most of the gain comes from the system reaching many more companies (${fmt(ms.funnel[0].control)} → ${fmt(ms.funnel[0].treatment)} contacted per 1,000). Per email, it is assumed to convert a little less (reply rate ${(100 * ms.reply_rate_assumed.treatment).toFixed(1)}% against ${(100 * ms.reply_rate_assumed.control).toFixed(1)}%). The experiment exists to find out which of these is true.</div>
+        </div>
+      </div>
+      <h3 style="margin:18px 0 0">In plain words</h3>
+      <div class="mi-plain">
+        <div class="card"><h3>What we measure</h3><span class="d">The <b>value of qualified leads</b> that a sales rep accepted as real opportunities, counted for ${ms.design.attribution_days} days. Replies and messages only help us read the test earlier.</span></div>
+        <div class="card"><h3>Why two equal groups</h3><span class="d">Companies are split <b>at random</b> (balanced by country, size and earlier contact; companies that share a domain stay together). So the only difference between the groups is how they were handled, and any gap in results comes from that.</span></div>
+        <div class="card"><h3>What keeps it safe</h3><span class="d">We watch unsubscribes, spam complaints, bounces, emails to companies we must never contact, and unsafe AI actions. If one goes wrong, <b>group B pauses</b>.</span></div>
+      </div>
+      <div class="card" style="margin-top:12px">
+        <h3>Where does the AI fit, and how would we know it helps?</h3>
+        <p class="d" style="margin:0 0 6px">The AI does two small jobs: it <b>reads replies</b> (free text that rules cannot parse) and it <b>writes one opening line</b> from verified facts. Everything else (who to contact, when, which sales rep) is plain rules.</p>
+        <p class="d" style="margin:0 0 6px">The AI has to earn its place. A second step splits group B in two: <b>B1 without AI</b> (rules, approved template, replies read by a person) and <b>B2 with AI</b>. The AI stays only if B2 beats B1 on qualified pipeline <i>and</i> on cost per qualified lead, without breaking a guardrail. If it does not, it is switched off there and the rules keep working.</p>
+        <span class="tag warn">proposed · not simulated · there is no result for the AI yet</span>
+      </div>
+      <details class="card" style="margin-top:12px"><summary>For analysts: funnel, guardrails with intervals, gradual rollout, safeguard, detection time</summary>
+        <h3 style="margin:12px 0 6px">The funnel, per 1,000 companies (simulated)</h3>
         ${ms.funnel.map(f => `<div class="barrow compact" style="grid-template-columns:1.4fr 3fr 160px"><div class="bl"><b>${esc(f.stage)}</b></div>
           <div><div class="track" style="margin-bottom:3px"><div class="fill" style="width:${100 * f.control / ms.funnel[0].treatment}%;background:#8B97B5"></div></div><div class="track"><div class="fill" style="width:${100 * f.treatment / ms.funnel[0].treatment}%;background:var(--accent)"></div></div></div>
-          <div class="bv"><span class="d">control</span> <b>${f.control}</b><br><span class="d">treatment</span> <b>${f.treatment}</b></div></div>`).join("")}
-        <p class="d" style="margin:8px 0 0">The lift in this simulation comes from <b>coverage</b>: the share of eligible companies reached goes from ${Math.round(100 * ms.coverage.control)}% to ${Math.round(100 * ms.coverage.treatment)}%, while the reply rate per email is assumed lower (${(100 * ms.reply_rate_assumed.treatment).toFixed(1)}% against ${(100 * ms.reply_rate_assumed.control).toFixed(1)}%). If real coverage gains are smaller, the case gets weaker, and the data would show it.</p>
-      </div>
-      <div class="grid g2" style="margin-top:10px;grid-template-columns:1.5fr 1fr">
-        <div class="card"><h3>Guardrails: breaches pause the treatment group</h3><div class="tablewrap"><table><thead><tr><th>guardrail</th><th>control</th><th>treatment</th><th>limit</th><th></th></tr></thead><tbody>
-          ${ms.guardrails.map(g => `<tr><td>${esc(g.name)}</td><td style="white-space:nowrap">${esc(g.control)}</td><td style="white-space:nowrap">${esc(g.treatment)}</td><td class="d" style="white-space:nowrap">${esc(g.limit)}</td><td>${g.status === "ok" ? tag("ok", "good") : tag("breach", "bad")}</td></tr>`).join("")}</tbody></table></div>
-          <p class="d" style="margin:6px 0 0">Also required: zero unsafe AI actions, an acceptable review-queue wait, and dead letters under control. ${ms.guardrails.some(g => g.status === "breach") ? "In this simulation one guardrail is breached: that is the plan working, because treatment would pause and be investigated." : ""}</p></div>
-        <div class="card"><h3>How long to detect a lift</h3><div class="tablewrap"><table><thead><tr><th>lift in SQL rate</th><th>companies per group</th><th>months at 50,000 a month</th></tr></thead><tbody>
+          <div class="bv"><span class="d">group A</span> <b>${f.control}</b><br><span class="d">group B</span> <b>${f.treatment}</b></div></div>`).join("")}
+        <p class="d" style="margin:8px 0 0">Coverage assumed: the share of eligible companies reached goes from ${Math.round(100 * ms.coverage.control)}% to ${Math.round(100 * ms.coverage.treatment)}%, while the reply rate per email is assumed lower (${(100 * ms.reply_rate_assumed.treatment).toFixed(1)}% against ${(100 * ms.reply_rate_assumed.control).toFixed(1)}%). If real coverage gains are small the case weakens, and the data will show which part moved.</p>
+        <h3 style="margin:18px 0 4px">Difference in pipeline, with its 95% interval</h3>
+        ${miRange(ms.pipeline)}
+        <h3 style="margin:18px 0 2px">Guardrails say what the evidence supports</h3>
+        <p class="d" style="margin:0 0 6px">Each row shows group B's rate with its 95% interval against the limit (black mark). Counts are small, so a single number can mislead. Breaches pause group B.</p>
+        ${miGuards(ms.guardrails)}
+        <p class="d" style="margin:6px 0 0">Also required: zero unsafe AI actions, an acceptable review-queue wait, and dead letters under control.</p>
+        <div class="mi-call" style="margin-top:8px">${miGuardNote(ms.guardrails)}</div>
+        <h3 style="margin:18px 0 4px">Group B starts small and grows only while it is safe <span class="tag">proposed</span></h3>
+        ${miRamp()}
+        <p class="d" style="margin:2px 0 8px">&#9671; gate: before volume goes up, the guardrails are checked. The schedule is a design choice, not a result.</p>
+        <div class="mi-steps3"><div class="mi-st go"><b>GO</b><span class="d">Every interval is below its limit: volume goes up.</span></div><div class="mi-st hold"><b>HOLD</b><span class="d">An interval touches a limit: same volume, keep measuring.</span></div><div class="mi-st stop"><b>PAUSE</b><span class="d">An interval is entirely above a limit, or the limit is broken two weeks in a row. A policy violation or an unsafe AI action pauses at once.</span></div></div>
+        <h3 style="margin:18px 0 4px">A safeguard inside the system <span class="tag">proposed · thresholds to set with Clara's data</span></h3>
+        <div class="mi-brake"><div class="mi-box"><b>Watch</b><span class="d">Complaint rate over the last 7 days, once there are enough emails to read it.</span></div><div class="mi-arrow">→</div><div class="mi-box" style="border-color:#E3C58A;background:#FFFBF2"><b>Warn</b><span class="d">At 80% of the limit: alert a person.</span></div><div class="mi-arrow">→</div><div class="mi-box" style="border-color:#EBA9A9;background:#FFF7F7"><b>Stop releasing</b><span class="d">At the limit: approved emails stay held and a person is asked to look.</span></div><div class="mi-arrow">→</div><div class="mi-box"><b>A person decides</b><span class="d">Resume, lower volume or change the copy. The decision is written to the audit trail.</span></div></div>
+        <h3 style="margin:18px 0 4px">How long to detect a lift</h3>
+        <div class="tablewrap"><table><thead><tr><th>lift in SQL rate</th><th>companies per group</th><th>months at 50,000 a month</th></tr></thead><tbody>
           ${ms.power.map(p => `<tr><td>${esc(p.lift)}</td><td>${fmt(p.per_arm)}</td><td>${p.months}</td></tr>`).join("")}</tbody></table></div>
-          <p class="d" style="margin:6px 0 0">SQLs are rare (${(100 * ms.baseline_sql_rate).toFixed(3)}% of companies), so only large lifts show up in a month. Sanity checks: ${ms.aa.runs} no-difference re-runs gave ${ms.aa.false_positives} false positive${ms.aa.false_positives === 1 ? "" : "s"} (about ${(0.05 * ms.aa.runs).toFixed(0)} expected), and the groups are balanced.</p></div>
-      </div>
-      <p class="d" style="margin-top:8px">Cost per SQL (people time, AI and enrichment), simulated: USD ${fmt(ms.cost_per_sql.control)} in control against USD ${fmt(ms.cost_per_sql.treatment)} in treatment. The hours above are the efficiency story; this experiment is how the pipeline story would be proven.
+        <p class="d" style="margin:6px 0 0">SQLs are rare (${(100 * ms.baseline_sql_rate).toFixed(3)}% of companies), so only large lifts show up in a month. Splitting group B in two for the AI test makes each group smaller, so it takes longer: a point to settle with Clara's real volumes. Sanity checks: ${ms.aa.runs} no-difference re-runs gave ${ms.aa.false_positives} false positive${ms.aa.false_positives === 1 ? "" : "s"} (about ${(0.05 * ms.aa.runs).toFixed(0)} expected), and the groups are balanced.</p>
+      </details>
+      <p class="d" style="margin-top:8px">Cost per qualified lead (people time, AI and enrichment), simulated: USD ${fmt(ms.cost_per_sql.control)} in group A against USD ${fmt(ms.cost_per_sql.treatment)} in group B. The hours above are the efficiency story; this experiment is how the pipeline story would be proven.
         Full plan: <a href="https://github.com/apogeoconsara/challengeclara/blob/main/growth-orchestrator/docs/MEASUREMENT_PLAN.md" target="_blank" rel="noopener">MEASUREMENT_PLAN.md</a>.</p>
 
       <h2>Does it behave?</h2>
@@ -1072,6 +1129,85 @@ function factorRow(k, title, text, w, max) {
     <div class="fin"><input type="number" id="w_${k}" data-w="${k}" min="0" max="${max}" value="${w[k]}"> <span class="d">points</span></div>
     <div class="fbar"><div class="track"><div class="fill" id="fb_${k}" style="background:var(--accent)"></div></div><div class="d" id="fp_${k}"></div></div></div>`;
 }
+
+// ---- Measuring impact: charts drawn from public/data/measurement.json, and the replay ----
+function miRange(pl) {
+  const lo = pl.lo, hi = pl.hi, pt = pl.diff, min = Math.min(-5000, Math.floor(lo / 5000) * 5000), max = Math.max(50000, Math.ceil(hi / 10000) * 10000), X = v => 40 + (v - min) / (max - min) * 620;
+  let g = `<line x1="${X(min)}" x2="${X(max)}" y1="96" y2="96" stroke="#DFE4EE" stroke-width="1.5"/>`;
+  for (let t = 0; t <= max; t += 10000) g += `<line x1="${X(t)}" x2="${X(t)}" y1="92" y2="100" stroke="#64708A"/><text x="${X(t)}" y="116" text-anchor="middle" font-size="11.5" fill="#64708A">${t === 0 ? "0" : "$" + t / 1000 + "k"}</text>`;
+  g += `<rect x="${X(min)}" y="40" width="${X(0) - X(min)}" height="56" fill="#FCE8E8" opacity=".7"/><text x="${X(0) - 6}" y="30" text-anchor="end" font-size="11.5" fill="#A61B1B">worse</text>`;
+  g += `<line x1="${X(0)}" x2="${X(0)}" y1="34" y2="100" stroke="#DC2626" stroke-width="2" stroke-dasharray="4 3"/><text x="${X(0) + 6}" y="30" font-size="12" font-weight="600" fill="#A61B1B">no difference</text>`;
+  g += `<line x1="${X(lo)}" x2="${X(hi)}" y1="72" y2="72" stroke="#2F5DF4" stroke-width="3"/><line x1="${X(lo)}" x2="${X(lo)}" y1="64" y2="80" stroke="#2F5DF4" stroke-width="3"/><line x1="${X(hi)}" x2="${X(hi)}" y1="64" y2="80" stroke="#2F5DF4" stroke-width="3"/><circle cx="${X(pt)}" cy="72" r="8" fill="#2F5DF4"/>`;
+  g += `<text x="${X(pt)}" y="54" text-anchor="middle" font-size="13" font-weight="700" fill="#10182B">+USD ${fmt(pt)}</text><text x="${X(lo)}" y="140" text-anchor="middle" font-size="11.5" fill="#64708A">${lo < 0 ? "−" : ""}${fmt(Math.abs(lo))}</text><text x="${X(hi)}" y="140" text-anchor="middle" font-size="11.5" fill="#64708A">+${fmt(hi)}</text><text x="${(X(lo) + X(hi)) / 2}" y="140" text-anchor="middle" font-size="11.5" fill="#64708A">95% interval</text>`;
+  return `<svg class="mi-svg" viewBox="0 0 700 150" role="img" aria-label="Pipeline difference of USD ${fmt(pt)} with a 95% interval from ${fmt(lo)} to ${fmt(hi)}${pl.includes_zero ? ", which includes zero" : ""}">${g}</svg>`;
+}
+function miGuards(list) {
+  return list.map(r => {
+    if (!r.ci_pct) return `<div class="mi-grow"><div><b>${esc(r.name)}</b></div><div class="d">The rules block every one of them in the system.</div><div>${r.evidence === "go" ? '<span class="tag good">GO · none</span>' : '<span class="tag bad">PAUSE</span>'}<div class="d">group A ${r.events.control} · group B ${r.events.treatment} · limit 0</div></div></div>`;
+    const [lo, hi] = r.ci_pct, rate = 100 * r.events.treatment / r.contacted.treatment, lim = r.limit_pct, max = Math.max(lim * 1.9, hi * 1.12), X = v => 8 + v / max * 284;
+    const col = r.evidence === "go" ? "#2F5DF4" : r.evidence === "hold" ? "#B4740E" : "#DC2626";
+    const lab = r.evidence === "go" ? '<span class="tag good">GO · inside the limit</span>' : r.evidence === "hold" ? '<span class="tag warn">HOLD · not conclusive</span>' : '<span class="tag bad">PAUSE</span>';
+    return `<div class="mi-grow ${r.evidence === "hold" ? "hold" : ""}"><div><b>${esc(r.name)}</b><div class="d">${r.events.treatment} in ${fmt(r.contacted.treatment)} emails</div></div>
+      <svg class="mi-gsvg" viewBox="0 0 300 46" role="img" aria-label="${esc(r.name)} ${rate.toFixed(2)} percent, 95 percent interval ${lo} to ${hi}, limit ${lim}"><line x1="8" x2="292" y1="30" y2="30" stroke="#DFE4EE" stroke-width="2"/><line x1="${X(lo)}" x2="${X(hi)}" y1="22" y2="22" stroke="${col}" stroke-width="5" stroke-linecap="round"/><circle cx="${X(rate)}" cy="22" r="5.5" fill="${col}" stroke="#fff" stroke-width="2"/><line x1="${X(lim)}" x2="${X(lim)}" y1="6" y2="38" stroke="#10182B" stroke-width="2"/><text x="${X(lim)}" y="45" text-anchor="middle" font-size="9.5" fill="#64708A">limit ${lim}%</text></svg>
+      <div>${lab}<div class="d">${rate.toFixed(2)}% · 95%: ${lo.toFixed(2)}–${hi.toFixed(2)}%</div></div></div>`;
+  }).join("");
+}
+function miGuardNote(list) {
+  const h = list.find(r => r.evidence === "hold");
+  if (!h) return "<b>Every guardrail reads GO.</b> Each interval is below its limit, so volume could go up.";
+  return `<b>${esc(h.name)}: HOLD, not "breach".</b> ${h.events.treatment} events in ${fmt(h.contacted.treatment)} emails is ${(100 * h.events.treatment / h.contacted.treatment).toFixed(2)}%, but the interval (${h.ci_pct[0].toFixed(2)}% to ${h.ci_pct[1].toFixed(2)}%) includes the ${h.limit_pct}% limit. Both groups are assumed to have the same chance, so the gap is most likely chance. The rule keeps volume where it is and keeps measuring. It also flags something real: the assumed rate already sits close to the limit, so there is little room to grow.`;
+}
+function miRamp() {
+  const W = [[1, 10], [2, 25], [3, 50], [4, 50], [5, 100], [6, 100], [7, 100], [8, 100]], RX = w => 90 + (w - 1) * 78, RY = p => 150 - p;
+  let r = `<line x1="64" x2="660" y1="150" y2="150" stroke="#DFE4EE" stroke-width="1.5"/>`;
+  for (const p of [50, 100]) r += `<text x="56" y="${RY(p) + 4}" text-anchor="end" font-size="11" fill="#64708A">${p}%</text><line x1="64" x2="660" y1="${RY(p)}" y2="${RY(p)}" stroke="#EEF1F7"/>`;
+  r += `<text x="56" y="154" text-anchor="end" font-size="11" fill="#64708A">0</text><text x="64" y="14" font-size="11.5" fill="#64708A">share of planned group B volume</text>`;
+  for (const [w, p] of W) r += `<rect x="${RX(w) - 28}" y="${RY(p)}" width="56" height="${150 - RY(p)}" rx="5" fill="#2F5DF4" opacity="${.3 + p / 150}"/><text x="${RX(w)}" y="${RY(p) - 6}" text-anchor="middle" font-size="12" font-weight="700" fill="#10182B">${p}%</text><text x="${RX(w)}" y="170" text-anchor="middle" font-size="11.5" fill="#64708A">week ${w}</text>`;
+  for (const w of [2, 3, 5]) { const x = RX(w) - 39; r += `<line x1="${x}" x2="${x}" y1="30" y2="150" stroke="#10182B" stroke-dasharray="3 3" stroke-width="1.2"/><path d="M${x - 7} 24l7 -9l7 9l-7 9z" fill="#fff" stroke="#10182B" stroke-width="1.6"/>`; }
+  return `<svg class="mi-svg" viewBox="0 0 700 180" role="img" aria-label="Group B volume grows from 10 percent in week 1 to 100 percent in week 5, with a safety gate before each increase">${r}</svg>`;
+}
+let MI_RAF = 0;
+function bindOverview() {
+  const arena = $("#miArena"); if (!arena) return;
+  cancelAnimationFrame(MI_RAF);
+  const m = DATA.measurement, F = m.funnel, at = n => F.find(f => f.stage === n);
+  const FIN = { a: { c: at("Contacted").control, r: at("Replied").control, s: at("Sales-qualified (SQL)").control, p: m.pipeline.control },
+                b: { c: at("Contacted").treatment, r: at("Replied").treatment, s: at("Sales-qualified (SQL)").treatment, p: m.pipeline.treatment } };
+  const weeks = m.design.weeks, days = m.design.attribution_days, total = weeks * 7 + days, T = { pile: 1.0, split: 2.4, weeks: 11.4, end: 14.4 };
+  let seed = 7; const rnd = () => (seed = seed * 16807 % 2147483647) / 2147483647;
+  const order = [...Array(100).keys()].sort(() => rnd() - .5), rank = {}; order.forEach((k, i) => { rank[k] = i; });
+  const dots = [];
+  for (let i = 0; i < 200; i++) { const el = document.createElement("div"); el.className = "mi-dot"; arena.appendChild(el); dots.push({ el, px: rnd(), py: rnd(), g: i < 100 ? "a" : "b", k: i % 100 }); }
+  const ease = t => t < 0 ? 0 : t > 1 ? 1 : t * t * (3 - 2 * t), nf = (n, d) => n.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
+  const pos = (d, u) => { const w = arena.clientWidth, h = arena.clientHeight, s = Math.min(17, (w / 2 - 44) / 10), bx = (d.g === "a" ? w * .25 : w * .75) - 5 * s, by = Math.max(54, (h - 10 * s) / 2 + 14);
+    const gx = bx + (d.k % 10) * s + s / 2 - 6, gy = by + Math.floor(d.k / 10) * s + s / 2 - 6, x0 = w * .5 - 70 + d.px * 140 - 6, y0 = h * .5 - 60 + d.py * 120 - 6; return [x0 + (gx - x0) * u, y0 + (gy - y0) * u]; };
+  const SAY = [`<b>Step 1.</b> Take a list of companies and split it <b>at random</b> into two equal groups.`,
+    `<b>Step 2.</b> For ${weeks} weeks, group A is handled the way it is today and group B by the system. Each dot is a company; a dark dot has been contacted.`,
+    `<b>Step 3.</b> Sales takes time. We wait <b>${days} more days</b> before counting which leads became qualified pipeline.`,
+    `<b>Step 4.</b> Same rules for both groups, so now we can compare.`];
+  function render(t) {
+    const u = ease((t - T.pile) / (T.split - T.pile)), wk = Math.max(0, Math.min(weeks, (t - T.split) / (T.weeks - T.split) * weeks)), dd = t >= T.weeks ? Math.min(days, (t - T.weeks) / (T.end - T.weeks) * days) : 0;
+    const pf = wk / weeks, qf = t < T.weeks ? pf * .6 : .6 + .4 * Math.min(1, dd / days);
+    for (const d of dots) { const [x, y] = pos(d, u), n = Math.round(FIN[d.g].c / 10 * pf), on = rank[d.k] < n;
+      d.el.style.transform = `translate(${x}px,${y}px)`; d.el.style.background = u < .05 ? "#C9D1E3" : on ? (d.g === "a" ? "#6F7FA6" : "#2F5DF4") : (d.g === "a" ? "#D8DCE8" : "#C5D3FB"); }
+    $("#miGA").classList.toggle("show", u > .9); $("#miGB").classList.toggle("show", u > .9);
+    for (const g of ["a", "b"]) { const f = FIN[g]; $("#mi_" + g + "_c").textContent = nf(f.c * pf, 0); $("#mi_" + g + "_r").textContent = nf(f.r * pf, 1); $("#mi_" + g + "_s").textContent = nf(f.s * qf, 1); $("#mi_" + g + "_p").textContent = "$" + nf(f.p * qf, 0); }
+    const st = t < T.split ? 0 : t < T.weeks ? 1 : t < T.end ? 2 : 3;
+    document.querySelectorAll("#miStepper span").forEach((e, i) => e.classList.toggle("on", i === st));
+    $("#miSay").innerHTML = SAY[st];
+    $("#miBar").style.width = (t < T.split ? 0 : Math.min(100, (wk * 7 + dd) / total * 100)) + "%";
+    $("#miClock").textContent = t < T.split ? "Day 0" : t < T.weeks ? "Week " + Math.max(1, Math.ceil(wk - 1e-9)) : t < T.end ? "Day " + Math.round(weeks * 7 + dd) : "Day " + total;
+    $("#miResult").classList.toggle("show", st === 3);
+  }
+  let t0 = 0;
+  const tick = now => { if (!document.body.contains(arena)) return; const t = (now - t0) / 1000; render(Math.min(t, T.end + .01)); if (t < T.end + .01) MI_RAF = requestAnimationFrame(tick); else $("#miPlayBtn").textContent = "↻ Replay"; };
+  const play = () => { cancelAnimationFrame(MI_RAF); t0 = performance.now(); $("#miPlayBtn").textContent = "↻ Restart"; MI_RAF = requestAnimationFrame(tick); };
+  const end = () => { cancelAnimationFrame(MI_RAF); render(T.end + .01); $("#miPlayBtn").textContent = "↻ Replay"; };
+  $("#miPlayBtn").onclick = play; $("#miSkip").onclick = end;
+  render(0);
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) end(); else setTimeout(() => { if (document.body.contains(arena)) play(); }, 500);
+}
+
 function bindPriority() {
   const ov = DATA.overview, w = weights(ov.config);
   PRI.a = PRI.a || ov.config.active_version;
@@ -1321,6 +1457,7 @@ async function show(view, extra = {}) {
   if (k === "run") bindRun();
   if (k === "flows" && $("#briefMap") && state.cm) $("#briefMap").innerHTML = briefMapHtml(state.cm);
   if (k === "approvals") bindApprovals();
+  if (k === "overview") bindOverview();
   if (k === "priority") bindPriority();
   if (k === "automation") bindAutomation();
   if (k === "account") bindAccount();
