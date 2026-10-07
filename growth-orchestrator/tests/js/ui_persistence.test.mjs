@@ -138,4 +138,14 @@ await goSec("aisafety", "evals"); await page.waitForSelector(".ccase");
 assert.equal((await page.$$(".ccase")).length, 18, "the 18 evaluation cases should all be listed");
 assert.ok((await page.$$(".ccase.pass")).length > 0, "cards should carry the saved run's result");
 
+// 13. Personalized opening line: each fact says whether the rules allowed it, and the AI's one line is shown apart from the template
+const draftReply = { task: "draft", mode: "personalized", verdict: "accept", codes: [], usable_fact_ids: ["fct_edit_2", "fct_edit_3"], attempts: [],
+  claims: [{ fact_id: "fct_edit_2", text: "Dorada 80 posted 12 openings." }], subject: "Spend management", body: "Hi,\n\nI saw that Dorada 80 posted 12 openings.\n\nreply STOP" };
+await page.unroute("**/.netlify/functions/**");
+await page.route("**/.netlify/functions/**", r => r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(r.request().postData()?.includes('"draft"') ? draftReply : { configured: true, model: "m" }) }));
+await goSec("aisafety", "live"); await page.uncheck('[data-fv="0"]'); await page.click("#runDraft"); await page.waitForSelector(".aipart");
+assert.match(await text(".aipart"), /only part the AI wrote/);
+const stats = await page.$$eval(".fstat", e => e.map(x => x.innerText));
+assert.match(stats[0], /not verified/); assert.match(stats[1], /Allowed/);
+
 await browser.close(); server.close();

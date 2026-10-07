@@ -78,6 +78,11 @@ label.small { font-size: 12px; color: var(--muted); display: block; margin: 8px 
 .ccase .q { border-left: 3px solid var(--line); padding-left: 8px; color: var(--text); font-style: italic; }
 .ccase .why { color: var(--muted); font-size: 12.5px; } .ccase .res { margin-top: auto; font-size: 12.5px; }
 .ccase.pass { border-color: #BFE6CB; } .ccase.diff { border-color: #EDD5A8; }
+.fcard { border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; margin-bottom: 8px; background: var(--panel); } .fcard.ok { border-color: #BFE6CB; background: #F6FCF8; } .fcard.blocked { border-color: #EDD5A8; background: #FFFAF1; }
+.fcard input[type=text], .fcard input[type=date] { width: 100%; } .fmeta { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; margin-top: 6px; font-size: 12.5px; color: var(--muted); } .fmeta label { display: flex; align-items: center; gap: 5px; } .fmeta input[type=date] { width: auto; padding: 3px 6px; } .fstat { margin-left: auto; font-weight: 600; }
+.frules { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 10px; } .frules span { background: var(--panel-2); border-radius: 999px; padding: 2px 10px; font-size: 12.5px; }
+.aipart { background: var(--accent-dim); border: 1px solid #C9D6FB; border-radius: 10px; padding: 10px 12px; margin: 8px 0; } .aipart .cl { margin-top: 6px; font-size: 13px; }
+.dverdict { display: flex; align-items: center; gap: 10px; margin: 4px 0 6px; font-weight: 600; }
 .cmp td:first-child { color: var(--muted); width: 190px; }
 .ok { color: var(--good); font-weight: 600; } .no { color: var(--bad); font-weight: 600; }
 svg text { font-family: var(--font-body); }
@@ -533,16 +538,19 @@ const VIEWS = {
         </div>
         <div class="card" id="replyOut"><div class="d">The model's raw output, the validator verdict and the action chosen by rules will appear here.</div></div>
       </div>
-      <h2>2. Grounded personalization</h2>
+      <h2>2. Personalized opening line</h2>
+      <p class="lede" style="margin-top:0">The AI may write <b>one opening line</b> for an outreach email, and only from facts the rules approve. Everything else in the email is a fixed template it cannot change. Edit the facts and see what changes.</p>
       <div class="grid g2">
         <div class="card">
-          <label class="small" for="dcase">Account</label>
-          <select id="dcase">${drafts.map(c => `<option value="${c.case_id}">${esc(c.case_id)} · ${esc(c.input.account.name)} (${c.expected.usable_fact_ids.length} usable facts)</option>`).join("")}</select>
-          <label class="small">Facts the model is given (rules decide which are usable: verified, ≤1 year old, about this company, consistent with the CRM)</label>
+          <label class="small" for="dcase">Company</label>
+          <select id="dcase">${drafts.map(c => `<option value="${c.case_id}">${esc(c.input.account.name)} · ${c.input.facts.length} fact${c.input.facts.length === 1 ? "" : "s"} known</option>`).join("")}</select>
+          <h3 style="margin:12px 0 4px">What we know about it</h3>
+          <div class="d">A fact can only be used if it is:</div>
+          <div class="frules"><span>✓ verified</span><span>✓ under a year old</span><span>✓ about this company</span><span>✓ consistent with the CRM</span></div>
           <div id="facts"></div>
-          <p><button class="btn ghost" id="addFact">Add a fact</button> <button class="btn" id="runDraft">Draft with the live model</button></p>
+          <p><button class="btn ghost" id="addFact">Add a fact</button> <button class="btn" id="runDraft">Write the email with the live model</button></p>
         </div>
-        <div class="card" id="draftOut"><div class="d">The draft (display only), the claims it makes and the fact each one cites will appear here.</div></div>
+        <div class="card" id="draftOut"><div class="d">The email, the part the AI wrote and the fact behind it will appear here. Nothing is ever sent.</div></div>
       </div>`;
   },
 
@@ -813,32 +821,49 @@ function renderReply(j) {
       V010 model's suggested action overridden · V011 low confidence · V012 injection missed · G001 opt-out guard.</div></details>`;
 }
 
-function renderDraft(j) {
-  return `<h3>Draft (${esc(j.mode)}) ${tag(j.verdict, j.verdict === "accept" ? "good" : "warn")} ${(j.codes || []).map(c => tag(c, "warn")).join("")}</h3>
-    <div class="d">Usable facts by rules: ${j.usable_fact_ids.length ? j.usable_fact_ids.map(f => tag(f, "good")).join("") : "none → generic template, the model is not called"}</div>
-    <div class="email" style="margin-top:8px"><div class="hdr">Display only · not sent · no email client exists in this function</div><div><b>${esc(j.subject)}</b></div><div class="body">${esc(j.body)}</div></div>
-    ${j.claims && j.claims.length ? `<div style="margin-top:8px"><b>Claims:</b>${j.claims.map(c => `<div class="d">${tag(c.fact_id, "acc")} ${esc(c.text)}</div>`).join("")}</div>` : ""}
-    <details><summary>Raw model output (${(j.attempts || []).length} call${(j.attempts || []).length === 1 ? "" : "s"})</summary>${(j.attempts || []).map(a => `<pre>${esc(a.raw)}</pre>`).join("") || '<div class="d">No model call.</div>'}</details>
-    <div class="d" style="margin-top:6px">P004 unknown fact · P005 fact not usable · P006 claim adds details · P007 forbidden claim · P008 footer missing · P013 claim not in body · P015 template modified.</div>`;
+const FACT_AS_OF = "2026-10-01";
+function factStatus(f, usable) {                      // the rules decide; this only explains a "no" in plain words
+  if (usable) return ["ok", "✓ Allowed"];
+  if (!f.is_verified) return ["blocked", "✗ Blocked: not verified"];
+  if ((Date.parse(FACT_AS_OF) - Date.parse(f.observed_at)) / 864e5 > 365) return ["blocked", "✗ Blocked: over a year old"];
+  return ["blocked", "✗ Blocked: about another company or clashes with the CRM"];
+}
+function renderDraft(j, sent) {
+  const text = id => { const n = /(\d+)$/.exec(id || ""); return n && sent[+n[1] - 1] ? sent[+n[1] - 1].text : ""; };
+  const ok = j.verdict === "accept", used = j.usable_fact_ids.length > 0;
+  const head = !used ? ["ℹ️", "No fact passed the rules, so the email is the generic template and the model was not called."]
+    : ok ? ["✅", "The AI's opening line passed every check."] : ["⚠️", "The AI's draft failed a check, so it was not used. The generic template stands in."];
+  const ai = ok && used && j.claims && j.claims.length ? `<div class="aipart"><b>✨ The only part the AI wrote: the opening line</b>
+      ${j.claims.map(c => `<div class="cl">“${esc(c.text)}”<div class="d">Backed by the fact: ${esc(text(c.fact_id) || c.fact_id)}</div></div>`).join("")}</div>` : "";
+  return `<h3>Result</h3>
+    <div class="dverdict"><span aria-hidden="true">${head[0]}</span><span>${esc(head[1])}</span></div>${ai}
+    <div class="email" style="margin-top:8px"><div class="hdr">Preview only · nothing is sent</div><div><b>${esc(j.subject)}</b></div><div class="body">${esc(j.body)}</div></div>
+    <details style="margin-top:12px"><summary>Technical details</summary>
+      <div class="d" style="margin-top:6px">Verdict: ${tag(j.verdict, ok ? "good" : "warn")} ${(j.codes || []).map(c => tag(c, "warn")).join("")} · mode: ${esc(j.mode)}</div>
+      <div class="d">Facts the rules approved: ${used ? j.usable_fact_ids.map(f => tag(f, "good")).join("") : "none"}</div>
+      <h4 class="rh">Raw model output (${(j.attempts || []).length} call${(j.attempts || []).length === 1 ? "" : "s"})</h4>${(j.attempts || []).map(a => `<pre>${esc(a.raw)}</pre>`).join("") || '<div class="d">No model call.</div>'}
+      <div class="d" style="margin-top:6px">P004 unknown fact · P005 fact not usable · P006 claim adds details · P007 forbidden claim · P008 footer missing · P013 claim not in body · P015 template modified.</div></details>`;
 }
 
-let facts = [];
+let facts = [], factUsable = null;                    // factUsable: after a run, the ids the rules approved, in the order sent
 function drawFacts() {
-  $("#facts").innerHTML = facts.map((f, i) => `<div class="grid" style="grid-template-columns: 1fr auto auto; align-items:center; margin-bottom:6px">
-    <input type="text" data-fi="${i}" value="${esc(f.text)}" maxlength="300" aria-label="Fact ${i + 1}" />
-    <label class="d"><input type="checkbox" data-fv="${i}" ${f.is_verified ? "checked" : ""}/> verified</label>
-    <input type="text" data-fo="${i}" value="${esc(f.observed_at)}" style="width:170px" aria-label="Observed at" /></div>`).join("");
+  const sentIdx = []; facts.forEach((f, i) => { if (f.text.trim()) sentIdx.push(i); });
+  $("#facts").innerHTML = facts.map((f, i) => { const pos = sentIdx.indexOf(i), st = factUsable && pos >= 0 ? factStatus(f, factUsable.includes(`fct_edit_${pos + 1}`)) : null;
+    return `<div class="fcard ${st ? st[0] : ""}"><input type="text" data-fi="${i}" value="${esc(f.text)}" maxlength="300" placeholder="A fact about the company" aria-label="Fact ${i + 1}" />
+      <div class="fmeta"><label><input type="checkbox" data-fv="${i}" ${f.is_verified ? "checked" : ""}/> Verified</label>
+      <label>Seen on <input type="date" data-fo="${i}" value="${esc((f.observed_at || "").slice(0, 10))}" aria-label="Date seen" /></label>${st ? `<span class="fstat ${st[0] === "ok" ? "ok" : ""}">${st[1]}</span>` : ""}</div></div>`; }).join("");
 }
 
 async function bindLive() {
   const cases = await load("cases");
-  const setCase = id => { const c = cases.cases.find(x => x.case_id === id); facts = c.input.facts.map(f => ({ text: f.text, is_verified: f.is_verified, observed_at: f.observed_at })); drawFacts(); };
+  const setCase = id => { const c = cases.cases.find(x => x.case_id === id); factUsable = null; facts = c.input.facts.map(f => ({ text: f.text, is_verified: f.is_verified, observed_at: f.observed_at })); drawFacts(); };
   setCase($("#dcase").value);
   $("#dcase").onchange = e => setCase(e.target.value);
   $("#addFact").onclick = () => { if (facts.length < 5) { facts.push({ text: "", is_verified: true, observed_at: "2026-09-01T16:00:00Z" }); drawFacts(); } };
   $("#facts").oninput = e => { const t = e.target;
-    if (t.dataset.fi) facts[+t.dataset.fi].text = t.value; if (t.dataset.fo) facts[+t.dataset.fo].observed_at = t.value;
-    if (t.dataset.fv) facts[+t.dataset.fv].is_verified = t.checked; };
+    if (t.dataset.fi) facts[+t.dataset.fi].text = t.value; if (t.dataset.fo && t.value) facts[+t.dataset.fo].observed_at = `${t.value}T16:00:00Z`;
+    if (t.dataset.fv) facts[+t.dataset.fv].is_verified = t.checked;
+    if (factUsable && !t.dataset.fi) { factUsable = null; drawFacts(); } };   // a change makes the old verdicts stale
   $("#samples").onclick = e => { const i = e.target.dataset.sample; if (i !== undefined) { $("#reply").value = SAMPLES[+i].text; store.set("orch.replyText", $("#reply").value); } };
   const typed = store.get("orch.replyText"); if (typed && !LIVE.reply) $("#reply").value = typed;
   $("#reply").oninput = () => store.set("orch.replyText", $("#reply").value);
@@ -848,7 +873,7 @@ async function bindLive() {
   }
   if (LIVE.draft && cases.cases.some(c => c.case_id === LIVE.draft.case_id)) {   // and the last draft run
     $("#dcase").value = LIVE.draft.case_id;
-    facts = LIVE.draft.facts.map(f => ({ text: f.text, is_verified: f.is_verified, observed_at: f.observed_at })); drawFacts();
+    facts = LIVE.draft.facts.map(f => ({ text: f.text, is_verified: f.is_verified, observed_at: f.observed_at })); factUsable = LIVE.draft.usable || null; drawFacts();
     $("#draftOut").innerHTML = LIVE.draft.html;
   }
   $("#runReply").onclick = async () => {
@@ -862,7 +887,7 @@ async function bindLive() {
   $("#runDraft").onclick = async () => {
     const b = $("#runDraft"); b.disabled = true; $("#draftOut").innerHTML = '<div class="d">Calling the model…</div>';
     const case_id = $("#dcase").value, sent = facts.filter(f => f.text.trim());
-    try { LIVE.draft = { case_id, facts: sent, html: renderDraft(await fn({ task: "draft", case_id, facts: sent })) }; }
+    try { const j = await fn({ task: "draft", case_id, facts: sent }); LIVE.draft = { case_id, facts: sent, usable: j.usable_fact_ids, html: renderDraft(j, sent) }; factUsable = j.usable_fact_ids; drawFacts(); }
     catch (e) { LIVE.draft = { case_id, facts: sent, html: `<div class="no">${esc(e.message)}</div>` }; }
     store.set("orch.liveDraft", LIVE.draft);
     if ($("#draftOut")) { $("#draftOut").innerHTML = LIVE.draft.html; $("#runDraft").disabled = false; }
