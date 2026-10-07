@@ -57,6 +57,33 @@ class Flows(unittest.TestCase):
         self.assertEqual(published, json.loads(json.dumps(showcase.flows_payload(), default=str)),
                          "run: python -m orchestrator export-web")
 
+    def test_scenario_companies_are_told_apart_by_the_score(self):
+        tiers = {f["id"]: f["account"]["tier"] for f in self.flows.values()}
+        self.assertEqual({tiers[k] for k in ("F10", "F1")}, {"A"})
+        self.assertEqual(tiers["F9"], "C")
+        self.assertEqual(self.flows["F9"]["final"]["action"], "nurture")          # a weaker fit: no email, no AI call
+        self.assertGreater(len({f["account"]["name"] for f in self.flows.values()}), 8)
+        for f in self.flows.values():                                              # the demo companies are never the bare golden ones
+            self.assertNotRegex(f["account"]["name"], r"^Dorada \d+$")
+
+    def test_leads_cover_every_group_and_follow_the_rules(self):
+        leads = showcase.leads_payload()["leads"]
+        by = {t: [l for l in leads if l["account"]["tier"] == t] for t in "ABC"}
+        self.assertEqual({t: len(v) for t, v in by.items()}, {"A": 4, "B": 4, "C": 4})
+        for l in leads:
+            a = l["account"]
+            self.assertEqual(a["score"], sum(a["parts"].values()))
+            self.assertEqual(a["tier"], "A" if a["score"] >= a["tier_a"] else "B" if a["score"] >= a["tier_b"] else "C")
+            if a["tier"] == "C" and l["decision"]["action"] == "nurture":
+                self.assertIsNone(l["draft"])                                      # nurture: no email, no AI call
+            if l["draft"] and l["draft"]["ai"]:
+                self.assertTrue(l["draft"]["claims"])                              # an AI-written line always cites a fact
+                self.assertGreater(l["usable"], 0)
+
+    def test_published_leads_are_current(self):
+        published = json.loads((REPO / "public/data/leads.json").read_text(encoding="utf-8"))
+        self.assertEqual(published, json.loads(json.dumps(showcase.leads_payload(), default=str)), "run: python -m orchestrator export-web")
+
     def test_validator_codes_have_everyday_text(self):
         for c in ("G001", "V010", "V011", "V006"):
             self.assertIn(c, plain.VALIDATION_CODES)

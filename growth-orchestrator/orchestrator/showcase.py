@@ -13,6 +13,7 @@ import copy
 import json
 import math
 from collections import Counter
+from datetime import timedelta
 from pathlib import Path
 
 import hashlib
@@ -48,12 +49,69 @@ FLOWS = [
     ("F9", "A weaker-fit company is added", "The score sends it to the slow nurture track: no email and no AI call, only the enrolment is recorded.", "G040", 0, RECORDED),
     ("F10", "A strong-fit company is added", "Verified facts exist, so the AI writes the opening line. The validator checks it, and the draft waits for a person.", "G080", 0, RECORDED),
 ]
-# The golden companies are all alike (120 employees, no facts, so a plain 30 points). For the demo each scenario gets a company
-# that the score can tell apart: the same accounts, plus a payment-pain hypothesis (an inference, never usable in an email),
-# and for F9 a small company. The low-priority track is on, as in production. The overlay is labelled on the page.
-PAIN_FACT = {"type": "pain_hypothesis", "text": "Hypothesis (inferred): reconciling expenses likely means manual work.", "source_name": "Inferencia interna",
-             "source_url": None, "observed_at": "2026-09-21T16:00:00Z", "is_verified": False, "confidence": 0.5}
-OVERLAY = {"F9": {"employees": 25, "name": "Dorada Mini"}}          # every other flow gets the pain hypothesis
+# The golden companies are all alike (120 employees, no facts, a plain 30 points), which makes a demo look empty. For the demo each
+# scenario keeps its golden's mock behaviour (the CRM that fails, the webhook that repeats) but is lent a company from the committed
+# sample world, with its own facts and contact. `WHO` says which kind of company each scenario needs.
+SAMPLE = SEED_DIR / "sample"
+WHO = {"F10": {"tier": "A", "facts": 2}, "F0": {"tier": "B", "facts": 1}, "F4": {"tier": "B", "facts": 0}, "F8": {"tier": "B", "facts": 1},
+       "F6": {"tier": "B", "facts": 1}, "F7": {"tier": "B", "facts": 1}, "F9": {"tier": "C", "facts": 1},
+       "F1": {"tier": "A", "emp": (100, 140)}, "F2": {"tier": "B"}, "F5": {"tier": "B"}}
+WHO["F3"] = WHO["F0"]
+IDENTITY = ("name", "legal_name", "domain", "country", "industry", "employee_count", "employee_band", "revenue_band", "international_signal")
+_WORLD: dict = {}
+
+
+def _world() -> dict:
+    if not _WORLD:
+        by = lambda f, k: {r[k]: r for r in _jsonl(SAMPLE / f)}
+        facts, contacts = {}, {}
+        for f in _jsonl(SAMPLE / "company_facts.jsonl"):
+            facts.setdefault(f["account_id"], []).append(f)
+        for c in _jsonl(SAMPLE / "contacts.jsonl"):
+            contacts.setdefault(c["account_id"], []).append(c)
+        _WORLD.update(accounts=_jsonl(SAMPLE / "accounts.jsonl"), facts=facts, contacts=contacts)
+    return _WORLD
+
+
+def _lend(fid: str, taken: set) -> tuple[dict, list, dict] | None:
+    """A sample-world prospect that fits what scenario `fid` needs: its tier, how many usable facts, an English-speaking contact."""
+    w, need, cfg, now, pol = _world(), WHO[fid], scoring.load_config(), parse("2026-10-01T16:00:00Z"), Policy.load()
+    for a in sorted(w["accounts"], key=lambda x: x["account_id"]):
+        if (a["account_id"] in taken or a["crm_status"] != "prospect" or a["industry"] in pol.non_icp_industries
+                or (a["employee_count"] or 0) < pol.icp_min_employees):
+            continue
+        fs = w["facts"].get(a["account_id"], [])
+        c = next((c for c in w["contacts"].get(a["account_id"], []) if c["language"] == "en" and c["email_status"] == "valid"), None)
+        lo, hi = need.get("emp", (0, 10**9))
+        if (c is None or scoring.score(scoring.features(a, fs, cfg), cfg)["tier"] != need["tier"] or not lo <= (a["employee_count"] or 0) <= hi
+                or len(ai_draft.usable_facts(fs, a, now)) < need.get("facts", 0)
+                or ("facts" in need and need["facts"] == 0 and ai_draft.usable_facts(fs, a, now))):
+            continue
+        return a, fs, c
+    return None
+
+
+def _lend_all() -> dict:
+    taken, out = set(), {}
+    for fid in ["F10", "F0", "F4", "F8", "F6", "F7", "F9", "F1", "F2", "F5"]:
+        a, fs, c = _lend(fid, taken)
+        out[fid] = (a, fs, c)
+        taken.add(a["account_id"])
+    out["F3"] = out["F0"]
+    return out
+
+
+def _overlay(g: dict, who) -> None:
+    a, fs, c = who
+    mine = g["state"]["accounts"][0]
+    for k in IDENTITY:
+        mine[k] = a[k]
+    g["state"]["company_facts"] = [{**f, "account_id": mine["account_id"], "fact_id": f"{mine['account_id']}_{f['fact_id']}"} for f in fs]
+    k = g["state"]["contacts"][0]
+    for f in ("first_name", "last_name", "email", "title", "function", "seniority", "language"):
+        k[f] = c[f]
+
+
 CRM_FLOWS = {"F6", "F7", "F8"}
 COORDINATION = [
     {"system": "AI", "reads": "The prospect's own words (quoted thread removed) and verified company facts",
@@ -101,18 +159,16 @@ def _card(orch, aid: str) -> dict:
                     "suppressed": n("SELECT COUNT(*) FROM suppression WHERE account_id=?") > 0},
             "score": sc["score"], "tier": sc["tier"], "parts": sc["parts"], "version": cfg["version"],
             "size": feat["size"], "pain": feat["pain_text"], "signals": feat["signals"],
-            "tier_a": cfg["tier_a"], "tier_b": cfg["tier_b"], "max": w["size"] + w["pain"] + cfg["signal_cap"] * w["signal_each"]}
+            "tier_a": cfg["tier_a"], "tier_b": cfg["tier_b"], "max": w["size"] + w["pain"] + cfg["signal_cap"] * w["signal_each"],
+            "signal_each": w["signal_each"], "signal_cap": cfg["signal_cap"],
+            "facts": [{"text": f["text"], "source": f["source_name"], "seen": f["observed_at"][:10], "type": f["type"],
+                       "why_not": _why_not(f, a, parse("2026-10-01T16:00:00Z"))} for f in facts]}
 
 
-def _run(g: dict, idx: int, llm=None, fid: str = ""):
+def _run(g: dict, idx: int, llm=None, who=None):
     aid0 = g["events"][0]["account_id"]
-    ov = OVERLAY.get(fid, {})
-    if ov.get("employees"):
-        g["state"]["accounts"][0]["employee_count"] = ov["employees"]
-        g["state"]["accounts"][0]["employee_band"] = "11-50"
-        g["state"]["accounts"][0]["name"] = ov["name"]
-    elif not any(f["type"] == "pain_hypothesis" for f in g["state"].get("company_facts", [])):
-        g["state"].setdefault("company_facts", []).append({**PAIN_FACT, "fact_id": f"fct_{aid0}_pain", "account_id": aid0})
+    if who:
+        _overlay(g, who)
     orch = scenario.build(g, llm)
     orch.score_cfg = {**orch.score_cfg, "gate_enabled": True}
     aid = aid0
@@ -233,14 +289,85 @@ def _compose(fid, title, story, label, orch, ev, res, v0, v1, calls=(), card=Non
 def flows_payload() -> dict:
     golden = {g["id"]: g for g in scenario.load_golden()}
     out = []
+    lent = _lend_all()
     for fid, title, story, gid, idx, label in FLOWS:
         g, llm = copy.deepcopy(golden[gid]), None
         if fid == "F2":
             g["events"][0]["payload"]["body_text"] = GUARD_TEXT
             llm = FixtureLLM({GUARD_TEXT: reply_output("interested", GUARD_TEXT, {"interest_level": "high"}, 0.93)})
-        orch, ev, res, v0, v1, calls, card = _run(g, idx, llm, fid)
+        orch, ev, res, v0, v1, calls, card = _run(g, idx, llm, lent[fid])
         out.append(_compose(fid, title, story, label, orch, ev, res, v0, v1, calls, card))
     return {"label": RECORDED, "flows": out, "guard_text": GUARD_TEXT, "coordination": COORDINATION, "plain": {"actions": plain.ACTIONS}}
+
+
+# ------------------------------------------------------------------------------------------------------------------
+# Leads: twelve companies from the sample world (four per group), each run through the real engine as a new target, so the page
+# can show a lead the way a person would read it: the score and why, what the rules decided, the CRM record and the opening line.
+LEAD_TIERS = {"A": 4, "B": 4, "C": 4}
+
+
+def _why_not(f: dict, a: dict, now) -> str | None:
+    if not f["is_verified"]:
+        return "not verified"
+    if now - parse(f["observed_at"]) > timedelta(days=365):
+        return "older than a year"
+    if a["name"] not in f["text"]:
+        return "not about this company"
+    return None if ai_draft.usable_facts([f], a, now) else "clashes with the CRM"
+
+
+def _lead(aid: str, w: dict, sample: dict, golden: dict, now) -> dict:
+    a = next(x for x in w["accounts"] if x["account_id"] == aid)
+    g = copy.deepcopy(golden["G040"])
+    g["state"] = {"accounts": [a], "contacts": w["contacts"].get(aid, []), "company_facts": w["facts"].get(aid, []),
+                  **{n: [r for r in rs if r["account_id"] == aid] for n, rs in sample.items()}}
+    g["events"] = g["events"][:1]
+    g["events"][0]["account_id"] = aid
+    orch = scenario.build(g)
+    orch.score_cfg = {**orch.score_cfg, "gate_enabled": True}
+    card = _card(orch, aid)
+    res = orch.process(g["events"][0])
+    held = orch.pending_approvals()
+    final = res.final_action or res.action
+    contact = next((c for c in w["contacts"].get(aid, []) if c["language"] == "en" and c["email_status"] == "valid"), w["contacts"][aid][0])
+    facts = card["facts"]
+    act = plain.ACTIONS.get(final, [final, ""])
+    return {"id": aid, "account": card, "contact": {"name": f'{contact["first_name"]} {contact["last_name"]}', "title": contact["title"]},
+            "facts": facts, "decision": {"action": final, "text": act[0], "what": act[1], "codes": [plain.CODES.get(c, c) for c in res.reason_codes]},
+            "draft": ({"step": held[0]["step"], "subject": held[0]["subject"], "body": held[0]["body"], "ai": held[0]["mode"] != "generic" and bool(held[0]["claims"]),
+                       "claims": held[0]["claims"]} if held else None),
+            "usable": sum(1 for f in facts if not f["why_not"]), "audit": [x["kind"] for x in orch.audit.trail(account_id=aid)]}
+
+
+def leads_payload() -> dict:
+    """Twelve leads, four per group. Three of each group follow the normal path (A and B: an outreach email is prepared; C: nurture) and
+    one shows another outcome the rules can reach (waiting, needs better data, do not contact), so the page shows more than the happy path."""
+    w, now, cfg, pol = _world(), parse("2026-10-01T16:00:00Z"), scoring.load_config(), Policy.load()
+    golden = {g["id"]: g for g in scenario.load_golden()}
+    sample = {n: _jsonl(SAMPLE / f"{n}.jsonl") for n in ("opportunities", "outreach_history", "suppression")}
+    skip = {x[0]["account_id"] for x in _lend_all().values()}
+    main, other, countries = {t: [] for t in "ABC"}, {t: None for t in "ABC"}, {}
+    for a in sorted(w["accounts"], key=lambda x: x["account_id"]):
+        aid, fs = a["account_id"], w["facts"].get(a["account_id"], [])
+        if (aid in skip or a["crm_status"] != "prospect" or a["industry"] in pol.non_icp_industries or (a["employee_count"] or 0) < pol.icp_min_employees
+                or not any(c["language"] == "en" and c["email_status"] == "valid" for c in w["contacts"].get(aid, []))):
+            continue
+        t = scoring.score(scoring.features(a, fs, cfg), cfg)["tier"]
+        if len(main[t]) >= 3 and other[t] is not None:
+            if all(len(main[x]) >= 3 and other[x] is not None for x in "ABC"):
+                break
+            continue
+        if t != "C" and not ai_draft.usable_facts(fs, a, now):
+            continue
+        lead = _lead(aid, w, sample, golden, now)
+        normal = lead["decision"]["action"] == ("nurture" if t == "C" else "contact")
+        if normal and len(main[t]) < 3 and countries.get((t, a["country"]), 0) < 2:
+            main[t].append(lead)
+            countries[(t, a["country"])] = countries.get((t, a["country"]), 0) + 1
+        elif not normal and other[t] is None:
+            other[t] = lead
+    return {"label": "Each lead below is a synthetic company from the sample world, run through the real engine as a new target. The model's answer is an offline fixture; nothing is sent.",
+            "leads": [l for t in "ABC" for l in main[t] + [other[t]] if l]}
 
 
 # ------------------------------------------------------------------------------------------------------------------

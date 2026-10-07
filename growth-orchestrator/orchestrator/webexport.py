@@ -164,7 +164,7 @@ def export_all() -> list[Path]:
     written = []
     for name, payload in (("runs.json", runs()), ("stream.json", stream()), ("evals.json", evals_payload()),
                           ("cases.json", cases_payload()), ("scoring.json", scoring_payload()),
-                          ("flows.json", showcase.flows_payload()),
+                          ("flows.json", showcase.flows_payload()), ("leads.json", showcase.leads_payload()),
                           ("challenge_map.json", showcase.challenge_map_payload())):
         p = WEB / name
         p.write_text(json.dumps(payload, ensure_ascii=False, separators=(",", ":"), default=str), encoding="utf-8")
