@@ -1056,7 +1056,7 @@ function bindApprovalsEvents(view, sel) {
 function bindApprovals() { renderApprovals(); }
 
 // ---- Account Prioritization -------------------------------------------------------------------------------------------------
-const VKEY = "orch.versions", PRI = { a: null, b: "draft" };
+const VKEY = "orch.versions", PRI = { a: null, b: null };
 const localVersions = () => store.get(VKEY) || [];
 function allVersions(ov) {
   const act = ov.config.active_version;
@@ -1075,6 +1075,8 @@ function factorRow(k, title, text, w, max) {
 function bindPriority() {
   const ov = DATA.overview, w = weights(ov.config);
   PRI.a = PRI.a || ov.config.active_version;
+  // B opens on the official proposal, so the comparison shows its effect at once; once weights are edited, B shows the edits.
+  if (!PRI.b) PRI.b = Object.keys(store.get(WKEY) || {}).length ? "draft" : (ov.config.versions.find(v => v.status === "proposed") || { id: "draft" }).id;
   $("#priRules").innerHTML =
     factorRow("size", "1. Company size", "Does it look like Clara's sweet spot? Full points for 51 to 1,000 employees, half for 11 to 50 or over 1,000, none if smaller or unknown.", w, 100) +
     factorRow("pain", "2. Likely payment pain", "Public facts suggest payments or expenses are handled by hand. It is an inference, not confirmed by the company.", w, 100) +
@@ -1089,9 +1091,9 @@ function bindPriority() {
          <div class="d">A label for now: Top priority gets the same personal email as Standard. It leaves room to treat the best accounts differently later.</div></div></div>
      <p style="margin:12px 0 0"><button class="btn ghost" id="wReset">Back to the engine's version</button></p>`;
   document.querySelectorAll("[data-w]").forEach(i => i.oninput = () => {
-    store.set(WKEY, { ...(store.get(WKEY) || {}), [i.dataset.w]: Math.max(0, Number(i.value) || 0) }); renderPriority();
+    store.set(WKEY, { ...(store.get(WKEY) || {}), [i.dataset.w]: Math.max(0, Number(i.value) || 0) }); PRI.b = "draft"; renderPriority();
   });
-  $("#wReset").onclick = () => { store.set(WKEY, null); show("priority"); };
+  $("#wReset").onclick = () => { store.set(WKEY, null); PRI.b = null; show("priority"); };
   renderPriority();
 }
 
