@@ -1212,7 +1212,11 @@ function bindPriority() {
   const ov = DATA.overview, w = weights(ov.config);
   PRI.a = PRI.a || ov.config.active_version;
   // B opens on the official proposal, so the comparison shows its effect at once; once weights are edited, B shows the edits.
-  if (!PRI.b) PRI.b = Object.keys(store.get(WKEY) || {}).length ? "draft" : (ov.config.versions.find(v => v.status === "proposed") || { id: "draft" }).id;
+  // Saved edits that equal the engine's weights are not a change, so they must not hide the proposal.
+  if (!PRI.b) {
+    const act = ov.config.versions.find(v => v.id === ov.config.active_version), edited = act && Object.keys(act.weights).some(k => w[k] !== act.weights[k]);
+    PRI.b = edited ? "draft" : (ov.config.versions.find(v => v.status === "proposed") || { id: "draft" }).id;
+  }
   $("#priRules").innerHTML =
     factorRow("size", "1. Company size", "Does it look like Clara's sweet spot? Full points from 51 employees up, half for 11 to 50, none if smaller or unknown.", w, 100) +
     factorRow("pain", "2. Likely payment pain", "Public facts suggest payments or expenses are handled by hand. It is an inference, not confirmed by the company.", w, 100) +
@@ -1327,6 +1331,7 @@ function renderVersions(ov, vers, va) {
       <table style="margin-top:10px"><thead><tr><th>ready companies in…</th><th>A</th><th>B</th><th>change</th></tr></thead><tbody>
       ${["A", "B", "C"].map(t => `<tr><td>${TIER_NAME[t]}</td><td>${fmt(A.T[t].ready)}</td><td>${fmt(B.T[t].ready)}</td>
         <td>${B.T[t].ready - A.T[t].ready ? `<span class="${B.T[t].ready > A.T[t].ready ? "up" : "down"}">${B.T[t].ready > A.T[t].ready ? "+" : ""}${fmt(B.T[t].ready - A.T[t].ready)}</span>` : "·"}</td></tr>`).join("")}</tbody></table>
+      ${vb.draft && !changed && ov.config.versions.some(v => v.status === "proposed") ? `<p class="d" style="margin:10px 0 0">Version B is your edits, which equal version A. <button class="btn ghost mini" id="verProp">Compare with the official proposal</button></p>` : ""}
       <h3 style="margin:14px 0 6px">${fmt(changed)} of ${fmt(total)} ready companies (${total ? (100 * changed / total).toFixed(1) : 0}%) change group</h3>
       <div class="tablewrap"><table class="matrix"><thead><tr><th>A \ B</th>${["A", "B", "C"].map(t => `<th>${TIER_NAME[t]}</th>`).join("")}</tr></thead><tbody>
       ${["A", "B", "C"].map(r => `<tr><th>${TIER_NAME[r]}</th>${["A", "B", "C"].map(c => cell(r, c)).join("")}</tr>`).join("")}</tbody></table></div></div>
@@ -1344,7 +1349,10 @@ function renderVersions(ov, vers, va) {
       <div><label class="small" for="verNote">What changed and why (optional)</label><input type="text" id="verNote"></div></div>
       <p style="margin:10px 0 0"><button class="btn" id="verSave">Save version</button> <button class="btn ghost" id="verDl">Download version B as JSON</button></p>
       <p class="d">Saved versions stay in this browser. To make one the version the engine uses, add the downloaded JSON to <span class="mono">versions</span> in <span class="mono">data/seed/scoring_policy.json</span>, set <span class="mono">active_version</span>, and run the export. The engine records the version in every score it logs.</p></details>
-    <details class="card" style="margin-top:12px"><summary>Version history</summary><div class="tablewrap" style="margin-top:8px"><table><thead><tr><th>version</th><th>date</th><th>data</th><th>weights</th><th>effect on the previous version</th><th></th></tr></thead><tbody>${saved}</tbody></table></div></details>`;
+    <h3 style="margin:18px 0 6px">Change log: every version, in order</h3>
+    <p class="d" style="margin:0 0 6px">A change is identified by its weights and the data it was scored on. The engine records the version id in every score it logs, so any past decision can be traced to the version that made it. Effects are measured by running the whole stream per version.</p>
+    <div class="card"><div class="tablewrap"><table><thead><tr><th>version</th><th>date</th><th>data</th><th>weights</th><th>effect on the previous version</th><th></th></tr></thead><tbody>${saved}</tbody></table></div></div>`;
+  if ($("#verProp")) $("#verProp").onclick = () => { PRI.b = ov.config.versions.find(v => v.status === "proposed").id; renderPriority(); };
   $("#verA").onchange = e => { PRI.a = e.target.value; renderPriority(); };
   $("#verB").onchange = e => { PRI.b = e.target.value; renderPriority(); };
   $("#verSave").onclick = () => {

@@ -115,4 +115,11 @@ assert.deepEqual(berrors, []);
 
 assert.deepEqual(errors, []);
 console.log("ui persistence: ok");
+// 10. saved weights equal to the engine's are not a change: B still opens on the official proposal, and the change log is visible
+await page.evaluate(() => { const v = JSON.parse(localStorage.getItem("orch.weights") || "{}"); localStorage.setItem("orch.weights", JSON.stringify({ ...v, size: 30 })); });
+await page.goto(base + "#decisions"); await page.reload(); await goSec("decisions", "priority");
+assert.match(await text("#priVer"), /change group/);
+assert.doesNotMatch(await text("#priVer"), /\b0 of [\d,]+ ready companies/, "B opened on equal edits instead of the proposal");
+assert.match(await text("#priVer"), /Change log/);
+
 await browser.close(); server.close();
