@@ -18,6 +18,7 @@ from pathlib import Path
 import hashlib
 
 from . import db, plain, scenario, scoring, state
+from .db import rows
 from .ai import draft as ai_draft
 from .ai.fixture import FixtureLLM, reply_output
 from .engine import SENDERS, Orchestrator
@@ -44,7 +45,15 @@ FLOWS = [
     ("F6", "The CRM fails once (503)", "The write is retried with the same key: exactly one task lands in the CRM.", "G110", 0, RECORDED),
     ("F7", "The CRM answers \"unknown\"", "The system does not guess: it reads back by key before writing again, so nothing is written twice.", "G111", 0, RECORDED),
     ("F8", "The CRM record changed meanwhile (409)", "The decision is re-made on the fresh state before the system writes.", "G112", 0, RECORDED),
+    ("F9", "A weaker-fit company is added", "The score sends it to the slow nurture track: no email and no AI call, only the enrolment is recorded.", "G040", 0, RECORDED),
+    ("F10", "A strong-fit company is added", "Verified facts exist, so the AI writes the opening line. The validator checks it, and the draft waits for a person.", "G080", 0, RECORDED),
 ]
+# The golden companies are all alike (120 employees, no facts, so a plain 30 points). For the demo each scenario gets a company
+# that the score can tell apart: the same accounts, plus a payment-pain hypothesis (an inference, never usable in an email),
+# and for F9 a small company. The low-priority track is on, as in production. The overlay is labelled on the page.
+PAIN_FACT = {"type": "pain_hypothesis", "text": "Hypothesis (inferred): reconciling expenses likely means manual work.", "source_name": "Inferencia interna",
+             "source_url": None, "observed_at": "2026-09-21T16:00:00Z", "is_verified": False, "confidence": 0.5}
+OVERLAY = {"F9": {"employees": 25, "name": "Dorada Mini"}}          # every other flow gets the pain hypothesis
 CRM_FLOWS = {"F6", "F7", "F8"}
 COORDINATION = [
     {"system": "AI", "reads": "The prospect's own words (quoted thread removed) and verified company facts",
@@ -77,13 +86,41 @@ def _settle(orch, ev) -> list[dict]:
     return [orch.approve(p["key"], REVIEWER, now=parse(ev["received_at"])) for p in orch.pending_approvals()]
 
 
-def _run(g: dict, idx: int, llm=None):
+def _card(orch, aid: str) -> dict:
+    """The company as the demo shows it: the CRM mock record, and the score that picks its track."""
+    a, cfg = orch._account(aid), orch.score_cfg
+    facts = rows(orch.conn, "SELECT * FROM company_facts WHERE account_id=?", (aid,))
+    feat = scoring.features(a, facts, cfg)
+    sc = scoring.score(feat, cfg)
+    n = lambda q: orch.conn.execute(q, (aid,)).fetchone()[0]
+    w = cfg["weights"]
+    return {"name": a["name"], "country": a["country"], "industry": a["industry"], "employees": a["employee_count"],
+            "crm": {"status": a["crm_status"], "owner_ae": a["crm_owner_ae_id"], "contacts": n("SELECT COUNT(*) FROM contacts WHERE account_id=?"),
+                    "open_deals": n("SELECT COUNT(*) FROM opportunities WHERE account_id=? AND closed_at IS NULL"),
+                    "emails_so_far": n("SELECT COUNT(*) FROM outreach_history WHERE account_id=? AND sender_type='automated'"),
+                    "suppressed": n("SELECT COUNT(*) FROM suppression WHERE account_id=?") > 0},
+            "score": sc["score"], "tier": sc["tier"], "parts": sc["parts"], "version": cfg["version"],
+            "size": feat["size"], "pain": feat["pain_text"], "signals": feat["signals"],
+            "tier_a": cfg["tier_a"], "tier_b": cfg["tier_b"], "max": w["size"] + w["pain"] + cfg["signal_cap"] * w["signal_each"]}
+
+
+def _run(g: dict, idx: int, llm=None, fid: str = ""):
+    aid0 = g["events"][0]["account_id"]
+    ov = OVERLAY.get(fid, {})
+    if ov.get("employees"):
+        g["state"]["accounts"][0]["employee_count"] = ov["employees"]
+        g["state"]["accounts"][0]["employee_band"] = "11-50"
+        g["state"]["accounts"][0]["name"] = ov["name"]
+    elif not any(f["type"] == "pain_hypothesis" for f in g["state"].get("company_facts", [])):
+        g["state"].setdefault("company_facts", []).append({**PAIN_FACT, "fact_id": f"fct_{aid0}_pain", "account_id": aid0})
     orch = scenario.build(g, llm)
-    aid = g["events"][0]["account_id"]
+    orch.score_cfg = {**orch.score_cfg, "gate_enabled": True}
+    aid = aid0
     for ev in g["events"][:idx]:
         orch.process(ev)
         _settle(orch, ev)
     ev, v0, n0 = g["events"][idx], state.version(orch.conn, aid), len(orch.mocks.calls)
+    card = _card(orch, aid)
     res = orch.process(ev)
     for out in _settle(orch, ev):
         res.effects.append({"system": "approval", "kind": "approved", "reviewer": REVIEWER})
@@ -93,10 +130,10 @@ def _run(g: dict, idx: int, llm=None):
             res.effects.append({"system": "send", "kind": "email", "status": "ok" if out["status"] == "sent_mock" else out["status"],
                                 "attempts": out.get("attempts", 1)})
         res.email["status"] = out["status"]
-    return orch, ev, res, v0, state.version(orch.conn, aid), orch.mocks.calls[n0:]
+    return orch, ev, res, v0, state.version(orch.conn, aid), orch.mocks.calls[n0:], card
 
 
-def _compose(fid, title, story, label, orch, ev, res, v0, v1, calls=()) -> dict:
+def _compose(fid, title, story, label, orch, ev, res, v0, v1, calls=(), card=None) -> dict:
     r, aid = res.to_dict(), ev["account_id"]
     dup = res.handling in ("ignore_duplicate", "dedupe_by_content")
     trail = [a for a in orch.audit.trail(account_id=aid)
@@ -125,8 +162,10 @@ def _compose(fid, title, story, label, orch, ev, res, v0, v1, calls=()) -> dict:
                              ["Rules fix which actions are allowed for this account. The model cannot widen them."]))
         else:
             codes = [plain.CODES.get(c, c) for c in res.reason_codes]
-            st.append(_stage("rules", "Rules decide", "done", f"Decision: {plain.ACTIONS.get(res.action, [res.action])[0]}",
-                             codes + ["Deterministic policy: no AI involved in this decision."]))
+            head = "Eligible: passed every check" if res.action == "nurture" else f"Decision: {plain.ACTIONS.get(res.action, [res.action])[0]}"
+            st.append(_stage("rules", "Rules decide", "done", head,
+                             codes + (["Then the company's score picked the slow track instead of an email."] if res.action == "nurture" else [])
+                             + ["Deterministic policy: no AI involved in this decision."]))
         if ai.get("used_ai") or (ai and ai.get("task") == "draft" and ai.get("used_ai")):
             if reply:
                 conf = f' ({ai["confidence"]})' if ai.get("confidence") is not None else ""
@@ -139,7 +178,9 @@ def _compose(fid, title, story, label, orch, ev, res, v0, v1, calls=()) -> dict:
             st.append(_stage("model", "Claude interprets", "skipped", "No AI call needed", [why]))
         if ai and ai.get("used_ai"):
             codes = ai.get("codes") or []
-            head = "The rules overrode the model" if "G001" in codes else plain.VERDICTS.get(ai.get("verdict"), ai.get("verdict"))
+            head = ("The rules overrode the model" if "G001" in codes else
+                    "Accepted: every claim cites a verified fact about the company" if ai.get("task") == "draft" and ai.get("verdict") == "accept"
+                    else plain.VERDICTS.get(ai.get("verdict"), ai.get("verdict")))
             st.append(_stage("validator", "Validator checks", "done" if ai.get("verdict") in ("accept", "accept_with_warning") else "flag", head,
                              [plain.VALIDATION_CODES.get(c, c) for c in codes] or ["No violations."]))
         else:
@@ -182,7 +223,7 @@ def _compose(fid, title, story, label, orch, ev, res, v0, v1, calls=()) -> dict:
     out = {"id": fid, "title": title, "story": story, "label": label, "stages": st, "group": "crm" if fid in CRM_FLOWS else "core", "calls": log,
            "ledger": {k: list(v) for k, v in orch.mocks.ledger.items() if v},
            "audit": [{"kind": a["kind"], "ts": a["ts"], "detail": _short(a["detail"])} for a in trail],
-           "final": {"action": res.final_action or res.action, "codes": list(res.reason_codes), "text": act[0]}}
+           "final": {"action": res.final_action or res.action, "codes": list(res.reason_codes), "text": act[0]}, "account": card}
     if fid == "F2":
         out["contradiction"] = {"text": text, "claude_label": ai.get("label"), "claude_confidence": ai.get("confidence"),
                                 "guard": "G001" in (ai.get("codes") or []), "final_action": res.action}
@@ -197,8 +238,8 @@ def flows_payload() -> dict:
         if fid == "F2":
             g["events"][0]["payload"]["body_text"] = GUARD_TEXT
             llm = FixtureLLM({GUARD_TEXT: reply_output("interested", GUARD_TEXT, {"interest_level": "high"}, 0.93)})
-        orch, ev, res, v0, v1, calls = _run(g, idx, llm)
-        out.append(_compose(fid, title, story, label, orch, ev, res, v0, v1, calls))
+        orch, ev, res, v0, v1, calls, card = _run(g, idx, llm, fid)
+        out.append(_compose(fid, title, story, label, orch, ev, res, v0, v1, calls, card))
     return {"label": RECORDED, "flows": out, "guard_text": GUARD_TEXT, "coordination": COORDINATION, "plain": {"actions": plain.ACTIONS}}
 
 
