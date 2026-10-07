@@ -39,7 +39,7 @@ function makeLLM(apiKey, model) {
         const res = await fetch("https://api.anthropic.com/v1/messages", {
           method: "POST", signal: ctrl.signal,
           headers: { "content-type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
-          body: JSON.stringify({ model, max_tokens: maxTokens, system, messages: [{ role: "user", content: user }],
+          body: JSON.stringify({ model, max_tokens: maxTokens, temperature: 0, system, messages: [{ role: "user", content: user }],
             tools: [tool], tool_choice: { type: "tool", name: tool.name } }),
         });
         if ([429, 500, 502, 503, 529].includes(res.status) && attempt === 0) { last = new Error(`HTTP ${res.status}`); continue; }

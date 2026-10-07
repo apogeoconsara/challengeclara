@@ -67,7 +67,7 @@ The human review of AI-drafted data and text (start with the demo flows G080, G0
 G047-48); the presentation; what to do with the old repo and site. The old API keys (Customer.io, OpenAI, n8n) are revoked.
 The Anthropic account holds about USD 5 of credit, which is the owner's spend cap: keep auto-reload off and check the
 balance before presenting, because the live demo stops if it reaches 0. The first live eval (2026-10-07) is stored in
-`evals/results/`; it must be re-run after any prompt, model or `EV-G0xx` change.
+`evals/results/`; it must be re-run after any prompt, model, temperature or `EV-G0xx` change (it predates `temperature: 0`, so a new run is pending, and it is read as a range, not a single number).
 
 Open policy decision (not to be changed without the owner): the rules put AE ownership before the 90-day closed-lost cooldown
 (see `docs/DECISION_LOG.md`). It would be validated with Sales/Growth in production.
