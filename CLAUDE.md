@@ -28,6 +28,9 @@ Start with `README.md`, `growth-orchestrator/README.md` and `growth-orchestrator
 ## How to work
 
 - Branch from `main`, open a PR to `main`, and let the owner merge (merging publishes the site). Never force-push.
+- One PR per batch of related work. While a PR is open, keep adding to it instead of opening another; open a new one only when the
+  owner asks for it. The owner wants the GitHub account clean: no PR per interaction, and no merge until the owner says so.
+  Agents cannot delete branches here, so name the merged branches the owner should delete.
 - Before building something big, give the route in a few lines and wait for approval. No new tabs for the sake of it.
 - Style: calm and friendly, Growth Ops language (not technical), a small type scale, compact cards. Figures that are
   simulated or rest on assumptions are always marked as such.
