@@ -392,12 +392,12 @@ const VIEWS = {
 
       <h2>Does it behave?</h2>
       <div class="grid g3">
-        <div class="card kpi"><div class="v">${passed}/${n}</div><div class="l">situations reproduced exactly by the engine: one for each eligibility rule and each risk the brief lists (opt-outs, duplicates, failures, late events…)</div></div>
+        <div class="card kpi"><div class="v">${passed}/${n}</div><div class="l">situations reproduced exactly by the engine: one for each eligibility rule and each risk the challenge lists (opt-outs, duplicates, failures, late events…)</div></div>
         <div class="card kpi"><div class="v">${esc(stream.agreement_with_truth)}</div><div class="l">sample deliveries matching the independent answer key</div></div>
         <div class="card kpi"><div class="v">${esc(ev.recorded.summary.verdict_and_codes_match)}</div><div class="l">AI outputs (good and deliberately broken) judged correctly by the safety checks</div></div>
       </div>
       <details class="card" style="margin-top:14px"><summary>Why ${n} situations? It is not a target</summary>
-        <p class="d" style="margin:8px 0 0">The number is a result, not a goal. We wrote one test situation for each eligibility rule and for each thing the brief says can go wrong, and that came to ${n}.
+        <p class="d" style="margin:8px 0 0">The number is a result, not a goal. We wrote one test situation for each eligibility rule and for each thing the challenge says can go wrong, and that came to ${n}.
         ${scenarioGroups(runs).map(([g, c]) => `${c} ${g}`).join(", ")}. Each situation is a case in <span class="mono">golden_scenarios.jsonl</span>, run on a fresh database and compared with the expected decision. Seven would leave rules untested; padding to a round hundred would repeat cases.</p></details>
       <details class="card" style="margin-top:14px"><summary>Where the data and the texts come from</summary>
         <p class="d" style="margin:8px 0 0">Every company, person and event is <b>synthetic</b>: a generator creates the 50,000-company world from a fixed seed, so it is identical every time. Nobody real appears anywhere.
@@ -420,7 +420,7 @@ const VIEWS = {
     return `<h1>Architecture</h1>
       <p class="lede">How an event travels through the system, and the reference runs that prove each part. ${esc(runs.label)}</p>
       <div class="card" style="overflow-x:auto">${diagram()}</div>
-      <details class="card" style="margin-top:12px"><summary><b>How this meets the brief</b>: every requirement, where to see it, where it is proven</summary><div id="briefMap" style="margin-top:8px"></div></details>
+      <details class="card" style="margin-top:12px"><summary><b>How this meets the challenge</b>: every requirement, where to see it, where it is proven</summary><div id="challengeMap" style="margin-top:8px"></div></details>
       <h2>Reference flows</h2>
       <div class="chips">${main.map(chip).join("")}</div>
       <div class="card" style="margin-bottom:12px"><h3>${esc(f.title)}</h3><div class="d">Challenge requirement: ${esc(f.pdf_requirement)}</div>
@@ -668,7 +668,7 @@ function scenarioGroups(runs) {
   const rest = runs.scenarios.length - out.reduce((s, x) => s + x[1], 0);
   return out.concat([["on routing, limits and mixed cases", rest]]).filter(x => x[1]);
 }
-function briefMapHtml(cm) {
+function challengeMapHtml(cm) {
   const base = "https://github.com/apogeoconsara/challengeclara/blob/main/growth-orchestrator/";
   return Object.entries(cm.groups).map(([g, title]) => `<h3 style="margin:12px 0 4px">${esc(title)}</h3><div class="tablewrap"><table><tbody>${cm.rows.filter(r => r.group === g).map(r =>
     `<tr><td style="width:38%">${esc(r.requirement)}</td><td><a href="#${r.view}" data-go="${r.view}">${esc(r.where)}</a></td><td class="mono"><a href="${base}${r.proof}" target="_blank" rel="noopener">${esc(r.proof)}</a></td></tr>`).join("")}</tbody></table></div>`).join("")
@@ -1769,7 +1769,7 @@ async function show(view, extra = {}) {
   if (k === "live") bindLive();
   if (k === "evals") bindEvals();
   if (k === "run") bindRun();
-  if (k === "flows" && $("#briefMap") && state.cm) $("#briefMap").innerHTML = briefMapHtml(state.cm);
+  if (k === "flows" && $("#challengeMap") && state.cm) $("#challengeMap").innerHTML = challengeMapHtml(state.cm);
   if (k === "approvals") bindApprovals();
   if (k === "overview") { bindMonth(); bindOverview(); }
   if (k === "priority") bindPriority();
