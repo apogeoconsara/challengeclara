@@ -416,8 +416,8 @@ def replay_payload(world: Path = GENERATED) -> dict:
         if aid not in seen:
             cnt[b] += 1
     rows_[-1] = [rows_[-1][0], rows_[-1][1]] + [cnt[c] for c in cols[2:]]
-    return {"label": "A replay of the recorded month: the 55,959 events of the 50,000 synthetic companies, in the order they arrived, "
-                     "through the real engine (model answers: an offline fixture). Nothing is sent.",
+    return {"label": "Recorded run of the real engine over the whole month: the 55,959 events of the 50,000 synthetic companies, in the order they "
+                     "arrived (model answers: an offline fixture). Nothing is sent.",
             "cols": cols, "rows": rows_, "total_events": len(events), "accounts": len(outcome)}
 
 
