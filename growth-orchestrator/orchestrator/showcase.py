@@ -373,6 +373,55 @@ def leads_payload() -> dict:
 
 
 # ------------------------------------------------------------------------------------------------------------------
+REPLAY_POINTS = 300
+BUCKET_OF = {"wait": "wait", "enrich": "lookup", "handoff_ae": "sales", "escalate_human": "review", "suppress": "blocked"}
+HANDLING_GROUP = {"ignore_duplicate": "dup", "dedupe_by_content": "dup", "retry_then_process": "retry", "reconcile_before_retry": "retry",
+                  "process_and_reconcile": "retry", "reread_and_reevaluate": "retry", "dead_letter": "dead", "dead_letter_and_alert": "dead"}
+
+
+def replay_payload(world: Path = GENERATED) -> dict:
+    """The month as the engine saw it, in the order the events arrived, for the Command Center's "Play the month".
+
+    Each company is counted once, when its first event arrives, under the decision the engine takes for it (the same decisions the
+    Command Center totals show). The event counters (duplicates, retries, dead letters) come from the real run of the whole stream."""
+    cfg, policy, now = scoring.load_config(), Policy.load(), parse("2026-10-01T16:00:00Z")
+    conn = db.connect()
+    db.load_world_dir(conn, world)
+    facts = {}
+    for f in db.rows(conn, "SELECT * FROM company_facts ORDER BY fact_id"):
+        facts.setdefault(f["account_id"], []).append(f)
+    outcome = {}
+    for a in db.rows(conn, "SELECT * FROM accounts ORDER BY account_id"):
+        d = decide(conn, a["account_id"], now, policy)
+        if d.action == "contact":
+            tier = scoring.score(scoring.features(a, facts.get(a["account_id"], []), cfg), cfg)["tier"]
+            outcome[a["account_id"]] = "nurture" if tier == "C" and cfg["gate_enabled"] else "email"
+        else:
+            outcome[a["account_id"]] = BUCKET_OF.get(d.action, "wait")
+    conn.close()
+    _, events, _, res = _stream_run(world)
+    cols = ["events", "day", "email", "nurture", "wait", "lookup", "sales", "review", "blocked", "dup", "retry", "dead"]
+    cnt, seen, rows_, step = Counter(), set(), [], max(1, math.ceil(len(events) / REPLAY_POINTS))
+    for i, (e, r) in enumerate(zip(events, res), 1):
+        aid = e["account_id"]
+        if aid in outcome and aid not in seen:
+            seen.add(aid)
+            cnt[outcome[aid]] += 1
+        g = HANDLING_GROUP.get(r.handling)
+        if g:
+            cnt[g] += 1
+        if i % step == 0 or i == len(events):
+            rows_.append([i, e["received_at"][:10]] + [cnt[c] for c in cols[2:]])
+    for aid, b in outcome.items():                              # a company with no event of its own still gets counted at the end
+        if aid not in seen:
+            cnt[b] += 1
+    rows_[-1] = [rows_[-1][0], rows_[-1][1]] + [cnt[c] for c in cols[2:]]
+    return {"label": "A replay of the recorded month: the 55,959 events of the 50,000 synthetic companies, in the order they arrived, "
+                     "through the real engine (model answers: an offline fixture). Nothing is sent.",
+            "cols": cols, "rows": rows_, "total_events": len(events), "accounts": len(outcome)}
+
+
+# ------------------------------------------------------------------------------------------------------------------
 def _jsonl(p: Path):
     return [json.loads(l) for l in p.read_text(encoding="utf-8").splitlines() if l.strip()]
 

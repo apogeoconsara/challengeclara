@@ -271,3 +271,20 @@ class Approvals(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+class MonthReplay(unittest.TestCase):
+    @unittest.skipUnless(GENERATED.exists(), "50k world not generated (make data)")
+    def test_the_replay_ends_on_the_command_center_totals(self):
+        r = showcase.replay_payload()
+        ov = json.loads((REPO / "public/data/overview.json").read_text(encoding="utf-8"))
+        last = dict(zip(r["cols"], r["rows"][-1]))
+        self.assertEqual(last["events"], r["total_events"])
+        self.assertEqual(sum(last[k] for k in ("email", "nurture", "wait", "lookup", "sales", "review", "blocked")), ov["n_accounts"])
+        self.assertEqual(last["sales"], ov["actions"]["handoff_ae"])
+        self.assertEqual(last["review"], ov["actions"]["escalate_human"])
+        self.assertEqual(last["blocked"], ov["actions"]["suppress"])
+        self.assertEqual(last["wait"], ov["actions"]["wait"])
+        self.assertEqual(last["email"] + last["nurture"], ov["actions"]["contact"])
+        for a, b in zip(r["rows"], r["rows"][1:]):                  # a running count never goes down
+            self.assertTrue(all(y >= x for x, y in zip(a[2:], b[2:])))
+
