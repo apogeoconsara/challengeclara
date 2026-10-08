@@ -113,6 +113,11 @@ table.lt { width: 100%; border-collapse: collapse; font-size: 13px; } table.lt t
 .fact { display: flex; gap: 8px; align-items: flex-start; padding: 6px 0; border-top: 1px solid var(--panel-2); font-size: 13px; } .fact .ok { white-space: nowrap; } .fact .no2 { white-space: nowrap; color: #B45309; font-weight: 600; }
 .stamp { display: inline-block; background: var(--accent-dim); color: #2347C4; border-radius: 6px; padding: 1px 7px; font-size: 11.5px; font-weight: 700; } .stamp.quiet { background: var(--panel-2); color: var(--muted); }
 @media (prefers-reduced-motion: reduce) { .st, .jfill { transition: none; } }
+.runbar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; } .rmclock { font-family: var(--font-head); font-weight: 700; font-size: 14px; font-variant-numeric: tabular-nums; }
+.rmprog { height: 5px; border-radius: 3px; background: var(--panel-2); overflow: hidden; margin: 8px 0 4px; } .rmprog i { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, var(--accent), var(--teal)); }
+.rmevs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); } @media (max-width: 760px) { .rmevs { grid-template-columns: repeat(2, 1fr); } }
+.rmevs div { font-size: 12px; color: var(--muted); } .rmevs b { display: block; font-family: var(--font-head); font-size: 20px; color: var(--text); font-variant-numeric: tabular-nums; }
+.impact div { transition: width .12s linear; }
 .cmp td:first-child { color: var(--muted); width: 190px; }
 .ok { color: var(--good); font-weight: 600; } .no { color: var(--bad); font-weight: 600; }
 svg text { font-family: var(--font-body); }
@@ -280,7 +285,7 @@ async function load(name) { if (!DATA[name]) DATA[name] = await (await fetch(`da
 // ---------------------------------------------------------------------------------------------------------------
 const VIEWS = {
   async overview() {
-    const [ov, runs, stream, ev, ap, ms] = await Promise.all([load("overview"), load("runs"), load("stream"), load("evals"), load("approvals"), load("measurement")]);
+    const [ov, runs, stream, ev, ap, ms, rp] = await Promise.all([load("overview"), load("runs"), load("stream"), load("evals"), load("approvals"), load("measurement"), load("replay")]);
     const aps = apStats(ap);
     const n = runs.scenarios.length, A = outcomeActions(ov), hm = hoursModel(ov);
     const B = { auto: A.contact + (A.nurture || 0) + A.wait + A.enrich, people: A.handoff_ae + A.escalate_human, blocked: A.suppress };
@@ -292,15 +297,19 @@ const VIEWS = {
       <div class="banner">Everything here uses synthetic companies. Emails are only prepared and recorded in a simulated log: <b>nothing is ever sent</b>.</div>
       <h2 style="margin-top:6px">What this means for the team</h2>
       <div class="card">
-        <div class="impact"><div style="width:${100 * B.auto / ov.n_accounts}%;background:var(--good)"></div><div style="width:${100 * B.people / ov.n_accounts}%;background:var(--warn)"></div><div style="width:${100 * B.blocked / ov.n_accounts}%;background:var(--bad)"></div></div>
+        <div class="runbar"><button class="btn" id="rmGo" disabled>Running…</button><span class="rmclock" id="rmClock">${fmt(rp.total_events)} events</span></div>
+        <div class="rmprog"><i id="rmProg"></i></div>
+        <div class="impact"><div id="rbA" style="width:${100 * B.auto / ov.n_accounts}%;background:var(--good)"></div><div id="rbP" style="width:${100 * B.people / ov.n_accounts}%;background:var(--warn)"></div><div id="rbB" style="width:${100 * B.blocked / ov.n_accounts}%;background:var(--bad)"></div></div>
         <div class="grid g3">
-          <div><div class="impact-num" style="color:var(--good)">${fmt(B.auto)}</div><b>Decided and prepared automatically (${(100 * B.auto / ov.n_accounts).toFixed(0)}%)</b>
+          <div><div class="impact-num" id="rnA" style="color:var(--good)">${fmt(B.auto)}</div><b>Decided and prepared automatically (<span id="rpA">${(100 * B.auto / ov.n_accounts).toFixed(0)}</span>%)</b>
             <div class="d"><b>Nothing has been sent.</b> The system decides and prepares; sending is a separate step that needs human approval. ${fmt(A.contact)} outreach emails prepared automatically${A.contact === ap.total_prepared ? ` (${fmt(ap.by_step["1"])} first emails and ${fmt(ap.follow_ups)} follow-ups)` : ""}, pending human approval before sending. Also ${fmt(A.nurture || 0)} enrolled in nurture, ${fmt(A.wait)} on hold, ${fmt(A.enrich)} data lookups.</div></div>
-          <div><div class="impact-num" style="color:var(--warn)">${fmt(B.people)}</div><b>Needs a person (${(100 * B.people / ov.n_accounts).toFixed(0)}%)</b>
+          <div><div class="impact-num" id="rnP" style="color:var(--warn)">${fmt(B.people)}</div><b>Needs a person (<span id="rpP">${(100 * B.people / ov.n_accounts).toFixed(0)}</span>%)</b>
             <div class="d">${fmt(A.handoff_ae)} go to a sales exec and ${fmt(A.escalate_human)} need a reviewer: conflicting records, former customers, duplicates.</div></div>
-          <div><div class="impact-num" style="color:var(--bad)">${fmt(B.blocked)}</div><b>Blocked (${(100 * B.blocked / ov.n_accounts).toFixed(0)}%)</b>
+          <div><div class="impact-num" id="rnB" style="color:var(--bad)">${fmt(B.blocked)}</div><b>Blocked (<span id="rpB">${(100 * B.blocked / ov.n_accounts).toFixed(0)}</span>%)</b>
             <div class="d">Should not be contacted at all: customers, opt-outs, open deals, competitors, poor fit. The system stops them before anyone wastes time.</div></div>
         </div>
+        <div class="rmevs"><div><b id="evN">${fmt(rp.total_events)}</b>events processed</div><div><b id="evD">0</b>duplicates ignored</div><div><b id="evR">0</b>retried safely</div><div><b id="evX">0</b>dead letters</div></div>
+        <div class="d" style="margin-top:8px">${esc(rp.label)}</div>
         <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line)"><b>~${fmt(hm.saved)} working hours potentially freed</b> (about ${hm.months.toFixed(1)} people-months, around USD ${fmt(hm.usd)}).
           People still spend ~${fmt(hm.still)} hours on the cases above that need judgment. <span class="d">Simulated: minutes per task are my assumptions. <a href="#automation" data-go="automation">Change them</a>.</span>
           <div class="d" style="margin-top:6px">Approval queue: ${aps.a} approved, ${aps.r} rejected and ${aps.p} pending in the batch of ${ap.batch} drafts. <a href="#approvals" data-go="approvals">Open the queue</a></div></div>
@@ -1419,6 +1428,42 @@ function miRamp() {
   return `<svg class="mi-svg" viewBox="0 0 700 180" role="img" aria-label="Group B volume grows from 10 percent in week 1 to 100 percent in week 5, with a safety gate before each increase">${r}</svg>`;
 }
 let MI_RAF = 0;
+
+// ---- The month, run on the Command Center. A recorded run of the engine over the whole month: the cumulative counts per checkpoint
+// come from data/replay.json. The counts are scaled to the totals shown on this page, so after an edit of the score weights the run
+// still ends on what the page says.
+const RM = { raf: 0, ran: false };
+const MONTH_MS = 25000;
+function bindMonth() {
+  const go = $("#rmGo"); if (!go) return;
+  cancelAnimationFrame(RM.raf);
+  const rp = DATA.replay, ov = DATA.overview, C = Object.fromEntries(rp.cols.map((c, i) => [c, i])), N = rp.rows.length, last = rp.rows[N - 1], A = outcomeActions(ov);
+  const fin = { A: A.contact + (A.nurture || 0) + A.wait + A.enrich, P: A.handoff_ae + A.escalate_human, B: A.suppress };
+  const sum = (r, ks) => ks.reduce((t, k) => t + r[C[k]], 0), grp = { A: ["email", "nurture", "wait", "lookup"], P: ["sales", "review"], B: ["blocked"] };
+  const row = p => { const x = p * (N - 1), i = Math.floor(x), f = x - i, a = rp.rows[i], b = rp.rows[Math.min(N - 1, i + 1)]; return a.map((v, k) => k === 1 ? (f < .5 ? v : b[k]) : v + (b[k] - v) * f); };
+  const day = d => new Date(d + "T12:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
+  const draw = p => {
+    const r = row(p), n = ov.n_accounts, v = {};
+    for (const k of ["A", "P", "B"]) v[k] = fin[k] * sum(r, grp[k]) / sum(last, grp[k]);
+    $("#rnA").textContent = fmt(v.A); $("#rnP").textContent = fmt(v.P); $("#rnB").textContent = fmt(v.B);
+    $("#rpA").textContent = (100 * v.A / n).toFixed(0); $("#rpP").textContent = (100 * v.P / n).toFixed(0); $("#rpB").textContent = (100 * v.B / n).toFixed(0);
+    $("#rbA").style.width = 100 * v.A / n + "%"; $("#rbP").style.width = 100 * v.P / n + "%"; $("#rbB").style.width = 100 * v.B / n + "%";
+    $("#evN").textContent = fmt(r[C.events]); $("#evD").textContent = fmt(r[C.dup]); $("#evR").textContent = fmt(r[C.retry]); $("#evX").textContent = fmt(r[C.dead]);
+    $("#rmProg").style.width = 100 * p + "%";
+    $("#rmClock").textContent = `${p < 1 ? "Processing" : "Processed"} ${fmt(r[C.events])} of ${fmt(rp.total_events)} events · ${day(rp.rows[Math.min(N - 1, Math.round(p * (N - 1)))][C.day])}`;
+  };
+  const finish = () => { draw(1); go.disabled = false; go.textContent = "↻ Run again"; RM.ran = true; };
+  const run = () => {
+    cancelAnimationFrame(RM.raf);
+    if (matchMedia("(prefers-reduced-motion: reduce)").matches) return finish();
+    go.disabled = true; go.textContent = "Running…"; const t0 = performance.now();
+    const step = now => { if (!$("#rmGo")) return; const p = Math.max(0, Math.min(1, (now - t0) / MONTH_MS)); draw(p); if (p < 1) RM.raf = requestAnimationFrame(step); else finish(); };
+    RM.raf = requestAnimationFrame(step);
+  };
+  go.onclick = run;
+  if (RM.ran) finish(); else { draw(0); setTimeout(() => { if ($("#rmGo") === go) run(); }, 600); }   // the first visit runs on its own; later visits show the end result
+}
+
 function bindOverview() {
   const arena = $("#miArena"); if (!arena) return;
   cancelAnimationFrame(MI_RAF);
@@ -1718,7 +1763,7 @@ async function show(view, extra = {}) {
   if (k === "run") bindRun();
   if (k === "flows" && $("#briefMap") && state.cm) $("#briefMap").innerHTML = briefMapHtml(state.cm);
   if (k === "approvals") bindApprovals();
-  if (k === "overview") bindOverview();
+  if (k === "overview") { bindMonth(); bindOverview(); }
   if (k === "priority") bindPriority();
   if (k === "automation") bindAutomation();
   if (k === "account") bindAccount();

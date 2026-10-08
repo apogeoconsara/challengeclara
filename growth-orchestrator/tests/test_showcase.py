@@ -285,6 +285,8 @@ class MonthReplay(unittest.TestCase):
         self.assertEqual(last["blocked"], ov["actions"]["suppress"])
         self.assertEqual(last["wait"], ov["actions"]["wait"])
         self.assertEqual(last["email"] + last["nurture"], ov["actions"]["contact"])
+        self.assertEqual(json.loads((REPO / "public/data/replay.json").read_text(encoding="utf-8")), json.loads(json.dumps(r)),
+                         "run: python -m orchestrator export-overview")
         for a, b in zip(r["rows"], r["rows"][1:]):                  # a running count never goes down
             self.assertTrue(all(y >= x for x, y in zip(a[2:], b[2:])))
 

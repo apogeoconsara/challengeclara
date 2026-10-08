@@ -168,4 +168,14 @@ assert.match(await text(".aipart"), /only part the AI wrote/);
 const stats = await page.$$eval(".fstat", e => e.map(x => x.innerText));
 assert.match(stats[0], /not verified/); assert.match(stats[1], /Allowed/);
 
+// 14. Command Center: the month runs on its own, ends on totals that add up to every company, and "Run again" starts it again
+await go("overview");
+await page.waitForFunction(() => { const b = document.querySelector("#rmGo"); return b && !b.disabled; }, null, { timeout: 40000 });
+assert.equal(await text("#rmGo"), "↻ Run again");
+const num = id => text(id).then(t => Number(t.replace(/,/g, "")));
+assert.equal(await num("#rnA") + await num("#rnP") + await num("#rnB"), 50000, "the three groups should add up to every company");
+assert.equal(await num("#evN"), 55959); assert.ok(await num("#evD") > 0 && await num("#evR") > 0 && await num("#evX") > 0);
+await page.click("#rmGo"); assert.equal(await text("#rmGo"), "Running…");
+assert.equal(await page.$eval("#rmGo", b => b.disabled), true);
+
 await browser.close(); server.close();
