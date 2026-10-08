@@ -1,4 +1,4 @@
-"""Alignment of the data with the challenge PDF: policy, templates, AI contracts + recorded outputs, routing,
+"""Alignment of the data with the challenge: policy, templates, AI contracts + recorded outputs, routing,
 send windows, experiment design, demo script, traceability, and a guard that no real company ever returns.
 
 Run:  python -m unittest discover -s tests -t .
@@ -258,13 +258,13 @@ class DemoAndTraceability(unittest.TestCase):
             self.assertTrue(set(f["golden"]) <= gids, f["id"])
             self.assertTrue(set(f["recordings"]) <= rids, (f["id"], set(f["recordings"]) - rids))
         needed = {"at least one successful flow", "one duplicate event", "one realistic failure scenario", "one ambiguous or unsafe AI case"}
-        self.assertTrue(needed <= {f["pdf_requirement"] for f in DEMO_FLOWS})
+        self.assertTrue(needed <= {f["requirement"] for f in DEMO_FLOWS})
         self.assertGreaterEqual(len(ASSUMPTION_DRILLS), 4)
         self.assertEqual(json.loads((SEED / "demo_flows.json").read_text()),
                          json.loads(json.dumps({"flows": DEMO_FLOWS, "assumption_drills": ASSUMPTION_DRILLS})))
 
     def test_traceability_references_exist(self):
-        text = (ROOT / "data" / "PDF_TRACEABILITY.md").read_text(encoding="utf-8")
+        text = (ROOT / "data" / "TRACEABILITY.md").read_text(encoding="utf-8")
         gids = {g["id"] for g in golden.GOLDEN}
         rids = {r["recording_id"] for r in RECS}
         sample_tables = {"events.jsonl", "aes.jsonl", "ae_calendar.jsonl"}

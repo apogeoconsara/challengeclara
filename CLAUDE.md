@@ -28,6 +28,9 @@ Start with `README.md`, `growth-orchestrator/README.md` and `growth-orchestrator
 ## How to work
 
 - Branch from `main`, open a PR to `main`, and let the owner merge (merging publishes the site). Never force-push.
+- One PR per batch of related work. While a PR is open, keep adding to it instead of opening another; open a new one only when the
+  owner asks for it. The owner wants the GitHub account clean: no PR per interaction, and no merge until the owner says so.
+  Agents cannot delete branches here, so name the merged branches the owner should delete.
 - Before building something big, give the route in a few lines and wait for approval. No new tabs for the sake of it.
 - Style: calm and friendly, Growth Ops language (not technical), a small type scale, compact cards. Figures that are
   simulated or rest on assumptions are always marked as such.
@@ -52,8 +55,8 @@ After changing the engine or the data, regenerate the page JSON: tests fail when
 ## Terms (keep them consistent everywhere: page, docs, code comments)
 
 - **Outreach email**: any email the engine drafts for a `contact` decision. It is step 1 (a **first email**) or step 2 to 4
-  (a **follow-up email**), depending on how many automated emails the company already got. Of the 5,702 prepared in the
-  50k world, 3,059 are first emails and 2,643 are follow-ups. Never call all of them "first emails".
+  (a **follow-up email**), depending on how many automated emails the company already got. Of the 5,897 prepared in the
+  50k world, 3,161 are first emails and 2,736 are follow-ups. Never call all of them "first emails".
 - **Nurture**: the slow track for eligible but weaker-fit companies. It sends no email and calls no model; it only records the
   enrolment. Do not call it a "follow-up", which is reserved for step 2 to 4 emails.
 - Only steps 1 and 3 have an opening line the AI may write (and only when a verified fact exists); steps 2 and 4 are fixed text.
@@ -64,7 +67,7 @@ The human review of AI-drafted data and text (start with the demo flows G080, G0
 G047-48); the presentation; what to do with the old repo and site. The old API keys (Customer.io, OpenAI, n8n) are revoked.
 The Anthropic account holds about USD 5 of credit, which is the owner's spend cap: keep auto-reload off and check the
 balance before presenting, because the live demo stops if it reaches 0. The first live eval (2026-10-07) is stored in
-`evals/results/`; it must be re-run after any prompt, model or `EV-G0xx` change.
+`evals/results/`; it must be re-run after any prompt, model, temperature or `EV-G0xx` change (it predates `temperature: 0`, so a new run is pending, and it is read as a range, not a single number).
 
 Open policy decision (not to be changed without the owner): the rules put AE ownership before the 90-day closed-lost cooldown
 (see `docs/DECISION_LOG.md`). It would be validated with Sales/Growth in production.

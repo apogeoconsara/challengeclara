@@ -34,7 +34,7 @@ Same `(seed, n)` ⇒ byte-identical files (`manifest.json` carries a determinism
 | `data/generated/` | **no** (regenerated) | the full 50k-account world: JSONL + `growth.sqlite` + `truth/` |
 | `data/reports/data_profile.md` | yes | distributions, coverage matrix, 27 validation checks |
 | `data/reports/impact_example.md` | yes | measurement-plan worked example on SIMULATED outcomes |
-| `data/PDF_TRACEABILITY.md` | yes | challenge PDF requirement → data → test (references are test-checked) |
+| `data/TRACEABILITY.md` | yes | challenge requirement → data → test (references are test-checked) |
 | `data/POLICY.md` | yes | the decision policy the labels encode |
 
 ## Tables (`data/generated/*.jsonl` and `growth.sqlite`)

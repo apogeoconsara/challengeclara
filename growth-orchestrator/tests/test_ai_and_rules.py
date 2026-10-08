@@ -104,6 +104,24 @@ class LLMClientSecrets(unittest.TestCase):
             c = llm_mod.AnthropicLLM()
             self.assertIn("api.anthropic.com", c.base)
 
+    def test_live_calls_ask_for_temperature_zero(self):
+        # Reading a reply is classification: the request must not leave the sampling temperature at the API default (1.0),
+        # in the Python client and in the Netlify function alike.
+        sent = {}
+
+        class Resp:
+            def __enter__(self): return self
+            def __exit__(self, *a): return False
+            def read(self): return b'{"content":[{"type":"tool_use","input":{}}],"usage":{}}'
+
+        def fake(req, timeout=None):
+            sent.update(json.loads(req.data)); return Resp()
+        with mock.patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}, clear=False), mock.patch("urllib.request.urlopen", fake):
+            llm_mod.AnthropicLLM().run("s", "u", {"name": "t"})
+        self.assertEqual(sent["temperature"], 0)
+        fn = (Path(__file__).resolve().parents[2] / "netlify" / "functions" / "orchestrator-llm.mjs").read_text()
+        self.assertIn("temperature: 0", fn)
+
 
 if __name__ == "__main__":
     unittest.main()

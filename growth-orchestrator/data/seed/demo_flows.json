@@ -3,7 +3,7 @@
     {
       "id": "D1",
       "title": "Successful end-to-end flow with grounded personalization",
-      "pdf_requirement": "at least one successful flow",
+      "requirement": "at least one successful flow",
       "golden": [
         "G080"
       ],
@@ -29,7 +29,7 @@
     {
       "id": "D2",
       "title": "Duplicate delivery",
-      "pdf_requirement": "one duplicate event",
+      "requirement": "one duplicate event",
       "golden": [
         "G040",
         "G041",
@@ -52,7 +52,7 @@
     {
       "id": "D3",
       "title": "Failure: transient error and uncertain outcome",
-      "pdf_requirement": "one realistic failure scenario",
+      "requirement": "one realistic failure scenario",
       "golden": [
         "G070",
         "G072",
@@ -73,7 +73,7 @@
     {
       "id": "D4",
       "title": "Ambiguous / unsafe AI output",
-      "pdf_requirement": "one ambiguous or unsafe AI case",
+      "requirement": "one ambiguous or unsafe AI case",
       "golden": [
         "G064",
         "G065",
@@ -100,7 +100,7 @@
     {
       "id": "D5",
       "title": "Malformed AI output",
-      "pdf_requirement": "AI output may be incomplete, malformed or unsupported by the data",
+      "requirement": "AI output may be incomplete, malformed or unsupported by the data",
       "golden": [
         "G063",
         "G066"
@@ -124,7 +124,7 @@
     {
       "id": "D6",
       "title": "Out-of-order race (late unsubscribe)",
-      "pdf_requirement": "events may arrive delayed or out of order",
+      "requirement": "events may arrive delayed or out of order",
       "golden": [
         "G047",
         "G048"

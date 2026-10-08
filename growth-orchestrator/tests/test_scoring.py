@@ -113,6 +113,11 @@ class Score(unittest.TestCase):
         self.assertEqual(scoring.score(f, self.cfg)["tier"], "B")           # 30 + 25 = 55
         self.assertEqual(scoring.score(f, self.cfg, {"size": 50, "pain": 30, "signal_each": 15})["tier"], "A")
 
+    def test_size_bands_have_no_upper_limit(self):
+        feat = lambda n: scoring.features({"employee_count": n, "international_signal": False}, [], self.cfg)["size"]
+        self.assertEqual([feat(n) for n in (None, 5, 10, 11, 50, 51, 1000, 1001, 25000)],
+                         ["unknown", "below", "below", "edge", "edge", "ideal", "ideal", "ideal", "ideal"])
+
     def test_edge_size_rounds_half_up(self):
         w = {"size": 31, "pain": 0, "signal_each": 0}
         self.assertEqual(scoring.score({"size": "edge", "pain": False, "signals": []}, self.cfg, w)["parts"]["size"], 16)

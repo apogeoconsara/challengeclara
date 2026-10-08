@@ -16,6 +16,11 @@ from dataclasses import dataclass
 from .prompts import DEFAULT_MODEL
 
 
+# Reading a reply is classification and extraction, so the model gets no room for variety: the same text should give the same
+# answer as far as the API allows. (Left at the default of 1.0, two live evals of the same prompt scored differently.)
+TEMPERATURE = 0
+
+
 @dataclass
 class LLMResponse:
     raw: str
@@ -42,7 +47,7 @@ class AnthropicLLM:
             raise LLMUnavailable("ANTHROPIC_API_KEY is not set")
 
     def run(self, system: str, user: str, tool: dict, max_tokens: int = 700) -> LLMResponse:
-        body = json.dumps({"model": self.model, "max_tokens": max_tokens, "system": system,
+        body = json.dumps({"model": self.model, "max_tokens": max_tokens, "temperature": TEMPERATURE, "system": system,
                            "messages": [{"role": "user", "content": user}],
                            "tools": [tool], "tool_choice": {"type": "tool", "name": tool["name"]}}).encode()
         req = urllib.request.Request(f"{self.base}/v1/messages", data=body, method="POST", headers={

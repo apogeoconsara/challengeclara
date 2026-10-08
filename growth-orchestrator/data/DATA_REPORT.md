@@ -527,7 +527,7 @@ growth-orchestrator/
 ├── tests/                ← automatic tests (data, rules, engine, AI, web)
 ├── prompts/              ← the prompt for drafting more replies with an AI
 ├── data/
-│   ├── README.md · POLICY.md · PDF_TRACEABILITY.md · DATA_REPORT.md (this file)
+│   ├── README.md · POLICY.md · TRACEABILITY.md · DATA_REPORT.md (this file)
 │   ├── reports/          ← data_profile.md (figures) · impact_example.md (simulation)
 │   ├── seed/             ← IN GIT (~2.6 MB, reviewed): seeds, golden set, evals, templates,
 │   │   │                    policies, recorded AI outputs, demo, and sample/ (500 full accounts)

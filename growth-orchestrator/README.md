@@ -16,7 +16,7 @@ construction, and only after a person approves it.
 - Live page: https://growth-orchestration-system.netlify.app (recorded engine runs, a live AI panel, a live eval button)
 - Docs: [decision log](docs/DECISION_LOG.md) · [AI: scope, validation, autonomy](docs/AI.md) ·
   [measurement plan](docs/MEASUREMENT_PLAN.md) · [production thinking](docs/PRODUCTION.md) ·
-  [challenge traceability](data/PDF_TRACEABILITY.md) · [data](data/README.md)
+  [challenge traceability](data/TRACEABILITY.md) · [data](data/README.md)
 
 ## Setup and usage
 

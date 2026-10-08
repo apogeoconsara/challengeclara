@@ -26,7 +26,8 @@ def load_config(version: str | None = None) -> dict:
 def features(account: dict, facts: list[dict], cfg: dict) -> dict:
     """Raw inputs of the score (what the page needs to recompute it with other weights)."""
     n, (lo, hi) = account["employee_count"], cfg["size_sweet_spot"]
-    size = "unknown" if n is None else "ideal" if lo <= n <= hi else "edge" if n >= 11 else "below"
+    # From `lo` employees up there is no upper limit (hi is null): a large company is not a weaker fit for this score.
+    size = "unknown" if n is None else "ideal" if n >= lo and (hi is None or n <= hi) else "edge" if n >= 11 else "below"
     signals = [f["text"] for f in facts if f["is_verified"] and f["type"] in cfg["signal_fact_types"]]
     if account["international_signal"]:
         signals.append("International operations signal")

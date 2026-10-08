@@ -11,12 +11,15 @@ from __future__ import annotations
 
 import copy
 import json
+import math
 from collections import Counter
+from datetime import timedelta
 from pathlib import Path
 
 import hashlib
 
 from . import db, plain, scenario, scoring, state
+from .db import rows
 from .ai import draft as ai_draft
 from .ai.fixture import FixtureLLM, reply_output
 from .engine import SENDERS, Orchestrator
@@ -29,6 +32,8 @@ ROOT = Path(__file__).resolve().parent.parent
 GENERATED = ROOT / "data" / "generated"
 GUARD_TEXT = "I'm interested, but don't email me again."
 RECORDED = "Recorded run of the real engine. The model's answer is an offline fixture (a deterministic stand-in), not a live call."
+BROKEN = ("Recorded run of the real engine. The model's answer is a SIMULATED defect: we hand the engine a cut-off answer taken from the recorded "
+          "suite, because a strong model rarely breaks like this. The live button asks the real model to read the same reply.")
 SIMULATED = ("Recorded run of the real engine. The model's answer is a SIMULATED mistake: we hand the engine an \"interested\" answer, "
              "because a strong model usually gets this reply right. Use the live button to see what Claude really says.")
 
@@ -43,7 +48,80 @@ FLOWS = [
     ("F6", "The CRM fails once (503)", "The write is retried with the same key: exactly one task lands in the CRM.", "G110", 0, RECORDED),
     ("F7", "The CRM answers \"unknown\"", "The system does not guess: it reads back by key before writing again, so nothing is written twice.", "G111", 0, RECORDED),
     ("F8", "The CRM record changed meanwhile (409)", "The decision is re-made on the fresh state before the system writes.", "G112", 0, RECORDED),
+    ("F9", "A weaker-fit company is added", "The score sends it to the slow nurture track: no email and no AI call, only the enrolment is recorded.", "G040", 0, RECORDED),
+    ("F10", "A strong-fit company is added", "Verified facts exist, so the AI writes the opening line. The validator checks it, and the draft waits for a person.", "G080", 0, RECORDED),
+    ("F11", "A current customer is targeted", "The rules stop it before anything else: a customer is never prospected.", "G003", 0, RECORDED),
+    ("F12", "The company has an open deal", "A deal in negotiation belongs to its sales exec: no outreach from the SDR side.", "G006", 0, RECORDED),
+    ("F13", "The account owner is on leave", "The sales exec who owns the account is away, so the engine routes it to the backup.", "G101", 0, RECORDED),
+    ("F14", "An unsubscribe arrives a day late", "The opt-out happened before the email was drafted but arrived after it. The draft waiting for approval is cancelled.", "G047", 1, RECORDED),
+    ("F15", "The AI answers with broken output", "The model's answer is cut off, twice. The system does not guess: a person reads the reply.", "G068", 0, BROKEN),
 ]
+NO_SETTLE = {"F14"}                                  # the draft must still be waiting when the late event arrives
+# The golden companies are all alike (120 employees, no facts, a plain 30 points), which makes a demo look empty. For the demo each
+# scenario keeps its golden's mock behaviour (the CRM that fails, the webhook that repeats) but is lent a company from the committed
+# sample world, with its own facts and contact. `WHO` says which kind of company each scenario needs.
+SAMPLE = SEED_DIR / "sample"
+WHO = {"F10": {"tier": "A", "facts": 2}, "F0": {"tier": "B", "facts": 1}, "F4": {"tier": "B", "facts": 0}, "F8": {"tier": "B", "facts": 1},
+       "F6": {"tier": "B", "facts": 1}, "F7": {"tier": "B", "facts": 1}, "F9": {"tier": "C", "facts": 1},
+       "F1": {"tier": "A", "emp": (100, 140)}, "F2": {"tier": "B"}, "F5": {"tier": "B"}}
+WHO["F3"] = WHO["F0"]
+WHO.update({"F11": {"tier": "B"}, "F12": {"tier": "B"}, "F13": {"tier": "B"}, "F14": {"tier": "B", "facts": 1}, "F15": {"tier": "B"}})
+BROKEN_TEXT = "Thanks, but this quarter we're closing our budget. Write to me after November 24."
+IDENTITY = ("name", "legal_name", "domain", "country", "industry", "employee_count", "employee_band", "revenue_band", "international_signal")
+_WORLD: dict = {}
+
+
+def _world() -> dict:
+    if not _WORLD:
+        by = lambda f, k: {r[k]: r for r in _jsonl(SAMPLE / f)}
+        facts, contacts = {}, {}
+        for f in _jsonl(SAMPLE / "company_facts.jsonl"):
+            facts.setdefault(f["account_id"], []).append(f)
+        for c in _jsonl(SAMPLE / "contacts.jsonl"):
+            contacts.setdefault(c["account_id"], []).append(c)
+        _WORLD.update(accounts=_jsonl(SAMPLE / "accounts.jsonl"), facts=facts, contacts=contacts)
+    return _WORLD
+
+
+def _lend(fid: str, taken: set) -> tuple[dict, list, dict] | None:
+    """A sample-world prospect that fits what scenario `fid` needs: its tier, how many usable facts, an English-speaking contact."""
+    w, need, cfg, now, pol = _world(), WHO[fid], scoring.load_config(), parse("2026-10-01T16:00:00Z"), Policy.load()
+    for a in sorted(w["accounts"], key=lambda x: x["account_id"]):
+        if (a["account_id"] in taken or a["crm_status"] != "prospect" or a["industry"] in pol.non_icp_industries
+                or (a["employee_count"] or 0) < pol.icp_min_employees):
+            continue
+        fs = w["facts"].get(a["account_id"], [])
+        c = next((c for c in w["contacts"].get(a["account_id"], []) if c["language"] == "en" and c["email_status"] == "valid"), None)
+        lo, hi = need.get("emp", (0, 10**9))
+        if (c is None or scoring.score(scoring.features(a, fs, cfg), cfg)["tier"] != need["tier"] or not lo <= (a["employee_count"] or 0) <= hi
+                or len(ai_draft.usable_facts(fs, a, now)) < need.get("facts", 0)
+                or ("facts" in need and need["facts"] == 0 and ai_draft.usable_facts(fs, a, now))):
+            continue
+        return a, fs, c
+    return None
+
+
+def _lend_all() -> dict:
+    taken, out = set(), {}
+    for fid in ["F10", "F0", "F4", "F8", "F6", "F7", "F9", "F1", "F2", "F5", "F11", "F12", "F13", "F14", "F15"]:
+        a, fs, c = _lend(fid, taken)
+        out[fid] = (a, fs, c)
+        taken.add(a["account_id"])
+    out["F3"] = out["F0"]
+    return out
+
+
+def _overlay(g: dict, who) -> None:
+    a, fs, c = who
+    mine = g["state"]["accounts"][0]
+    for k in IDENTITY:
+        mine[k] = a[k]
+    g["state"]["company_facts"] = [{**f, "account_id": mine["account_id"], "fact_id": f"{mine['account_id']}_{f['fact_id']}"} for f in fs]
+    k = g["state"]["contacts"][0]
+    for f in ("first_name", "last_name", "email", "title", "function", "seniority", "language"):
+        k[f] = c[f]
+
+
 CRM_FLOWS = {"F6", "F7", "F8"}
 COORDINATION = [
     {"system": "AI", "reads": "The prospect's own words (quoted thread removed) and verified company facts",
@@ -67,6 +145,8 @@ def _stage(sid, name, status, headline, lines=()):
     return {"id": sid, "name": name, "status": status, "headline": headline, "lines": list(lines)}
 
 
+ROUTE_TEXT = {"OWNER": "the account owner", "OWNER_BACKUP": "the owner is away, so the backup", "TERRITORY": "the sales exec for its country with the most room",
+              "TERRITORY_FALLBACK": "no sales exec in its country has room, so one from another country"}
 REVIEWER = "demo reviewer (scripted stand-in for a person)"
 
 
@@ -76,13 +156,57 @@ def _settle(orch, ev) -> list[dict]:
     return [orch.approve(p["key"], REVIEWER, now=parse(ev["received_at"])) for p in orch.pending_approvals()]
 
 
-def _run(g: dict, idx: int, llm=None):
+class _CutOffLLM:
+    """Answers every reply with the same cut-off output from the recorded suite (what a model that stops mid-sentence would return)."""
+    mode, model = "fixture", "fixture"
+
+    def __init__(self):
+        rec = next(r for r in _jsonl(SEED_DIR / "llm_recordings.jsonl") if r["recording_id"] == "EV-R-NOW-01:truncated_json")
+        self.raw, self.calls = rec["model_output_raw"], []
+
+    def run(self, system, user, tool, max_tokens=700):
+        from .ai.llm import LLMResponse
+        self.calls.append(tool["name"])
+        return LLMResponse(self.raw, self.model, self.mode)
+
+
+def _card(orch, aid: str) -> dict:
+    """The company as the demo shows it: the CRM mock record, and the score that picks its track."""
+    a, cfg = orch._account(aid), orch.score_cfg
+    facts = rows(orch.conn, "SELECT * FROM company_facts WHERE account_id=?", (aid,))
+    feat = scoring.features(a, facts, cfg)
+    sc = scoring.score(feat, cfg)
+    n = lambda q: orch.conn.execute(q, (aid,)).fetchone()[0]
+    w = cfg["weights"]
+    people = rows(orch.conn, "SELECT * FROM contacts WHERE account_id=? ORDER BY contact_id", (aid,))
+    who = next((c for c in people if c["language"] == "en" and c["email_status"] == "valid"), people[0] if people else None)
+    return {"name": a["name"], "contact": {"first": who["first_name"], "name": f'{who["first_name"]} {who["last_name"]}', "title": who["title"]} if who else None, "country": a["country"], "industry": a["industry"], "employees": a["employee_count"],
+            "crm": {"status": a["crm_status"], "owner_ae": a["crm_owner_ae_id"], "contacts": n("SELECT COUNT(*) FROM contacts WHERE account_id=?"),
+                    "open_deals": n("SELECT COUNT(*) FROM opportunities WHERE account_id=? AND closed_at IS NULL"),
+                    "emails_so_far": n("SELECT COUNT(*) FROM outreach_history WHERE account_id=? AND sender_type='automated'"),
+                    "suppressed": n("SELECT COUNT(*) FROM suppression WHERE account_id=?") > 0,
+                    "drafts_waiting": n("SELECT COUNT(*) FROM actions WHERE account_id=? AND kind='email' AND status='pending_approval'")},
+            "score": sc["score"], "tier": sc["tier"], "parts": sc["parts"], "version": cfg["version"],
+            "size": feat["size"], "pain": feat["pain_text"], "signals": feat["signals"],
+            "tier_a": cfg["tier_a"], "tier_b": cfg["tier_b"], "max": w["size"] + w["pain"] + cfg["signal_cap"] * w["signal_each"],
+            "signal_each": w["signal_each"], "signal_cap": cfg["signal_cap"],
+            "facts": [{"text": f["text"], "source": f["source_name"], "seen": f["observed_at"][:10], "type": f["type"],
+                       "why_not": _why_not(f, a, parse("2026-10-01T16:00:00Z"))} for f in facts]}
+
+
+def _run(g: dict, idx: int, llm=None, who=None, settle_prior=True):
+    aid0 = g["events"][0]["account_id"]
+    if who:
+        _overlay(g, who)
     orch = scenario.build(g, llm)
-    aid = g["events"][0]["account_id"]
+    orch.score_cfg = {**orch.score_cfg, "gate_enabled": True}
+    aid = aid0
     for ev in g["events"][:idx]:
         orch.process(ev)
-        _settle(orch, ev)
+        if settle_prior:
+            _settle(orch, ev)
     ev, v0, n0 = g["events"][idx], state.version(orch.conn, aid), len(orch.mocks.calls)
+    card = _card(orch, aid)
     res = orch.process(ev)
     for out in _settle(orch, ev):
         res.effects.append({"system": "approval", "kind": "approved", "reviewer": REVIEWER})
@@ -92,10 +216,10 @@ def _run(g: dict, idx: int, llm=None):
             res.effects.append({"system": "send", "kind": "email", "status": "ok" if out["status"] == "sent_mock" else out["status"],
                                 "attempts": out.get("attempts", 1)})
         res.email["status"] = out["status"]
-    return orch, ev, res, v0, state.version(orch.conn, aid), orch.mocks.calls[n0:]
+    return orch, ev, res, v0, state.version(orch.conn, aid), orch.mocks.calls[n0:], card
 
 
-def _compose(fid, title, story, label, orch, ev, res, v0, v1, calls=()) -> dict:
+def _compose(fid, title, story, label, orch, ev, res, v0, v1, calls=(), card=None) -> dict:
     r, aid = res.to_dict(), ev["account_id"]
     dup = res.handling in ("ignore_duplicate", "dedupe_by_content")
     trail = [a for a in orch.audit.trail(account_id=aid)
@@ -106,8 +230,10 @@ def _compose(fid, title, story, label, orch, ev, res, v0, v1, calls=()) -> dict:
     final = res.action
     st = []
     text = (ev.get("payload") or {}).get("body_text")
+    late = (parse(ev["received_at"]) - parse(ev["occurred_at"])).total_seconds() / 3600
     st.append(_stage("event", "Event comes in", "done", plain.EVENTS.get(ev["type"], ev["type"]),
-                     [f'Delivery {ev["delivery_id"]}, source {ev.get("source", "?")}'] + ([f'"{text.strip()}"'] if text else [])))
+                     [f'Delivery {ev["delivery_id"]}, source {ev.get("source", "?")}'] + ([f'"{text.strip()}"'] if text else [])
+                     + ([f"Out of order: it happened {late:.0f} hours before it arrived, after the email draft was made"] if late > 1 else [])))
     if dup:
         st.append(_stage("state", "State changes", "skipped", f"Already processed: state stays at version {v0}", ["The delivery id was seen before."]))
         st.append(_stage("rules", "Rules decide", "skipped", "Nothing to decide: this is a duplicate"))
@@ -124,10 +250,16 @@ def _compose(fid, title, story, label, orch, ev, res, v0, v1, calls=()) -> dict:
                              ["Rules fix which actions are allowed for this account. The model cannot widen them."]))
         else:
             codes = [plain.CODES.get(c, c) for c in res.reason_codes]
-            st.append(_stage("rules", "Rules decide", "done", f"Decision: {plain.ACTIONS.get(res.action, [res.action])[0]}",
-                             codes + ["Deterministic policy: no AI involved in this decision."]))
+            head = "Eligible: passed every check" if res.action == "nurture" else f"Decision: {plain.ACTIONS.get(res.action, [res.action])[0]}"
+            st.append(_stage("rules", "Rules decide", "done", head,
+                             codes + (["Then the company's score picked the slow track instead of an email."] if res.action == "nurture" else [])
+                             + ["Deterministic policy: no AI involved in this decision."]))
         if ai.get("used_ai") or (ai and ai.get("task") == "draft" and ai.get("used_ai")):
-            if reply:
+            if reply and ai.get("label") is None:
+                st.append(_stage("model", "Claude interprets", "done", "Claude's answer came back cut off",
+                                 [f'Source of this answer: {"a simulated defect (a cut-off answer from the recorded suite)" if fid == "F15" else "an offline stand-in for the model"}.',
+                                  "The system asked once more and got the same defect. It only proposes; it never picks the action."]))
+            elif reply:
                 conf = f' ({ai["confidence"]})' if ai.get("confidence") is not None else ""
                 st.append(_stage("model", "Claude interprets", "done", f'Claude reads the reply as "{ai.get("label")}"{conf}',
                                  [f'Source of this answer: {"a simulated model mistake" if fid == "F2" else "an offline stand-in for the model (not a live call)"}.', "It only proposes: label and extracted facts. It never picks the action."]))
@@ -138,7 +270,10 @@ def _compose(fid, title, story, label, orch, ev, res, v0, v1, calls=()) -> dict:
             st.append(_stage("model", "Claude interprets", "skipped", "No AI call needed", [why]))
         if ai and ai.get("used_ai"):
             codes = ai.get("codes") or []
-            head = "The rules overrode the model" if "G001" in codes else plain.VERDICTS.get(ai.get("verdict"), ai.get("verdict"))
+            head = ("The rules overrode the model" if "G001" in codes else
+                    "Rejected twice: the output never matched the required structure" if ai.get("verdict") == "reject_retry" else
+                    "Accepted: every claim cites a verified fact about the company" if ai.get("task") == "draft" and ai.get("verdict") == "accept"
+                    else plain.VERDICTS.get(ai.get("verdict"), ai.get("verdict")))
             st.append(_stage("validator", "Validator checks", "done" if ai.get("verdict") in ("accept", "accept_with_warning") else "flag", head,
                              [plain.VALIDATION_CODES.get(c, c) for c in codes] or ["No violations."]))
         else:
@@ -162,7 +297,7 @@ def _compose(fid, title, story, label, orch, ev, res, v0, v1, calls=()) -> dict:
         if r.get("needs_human_review") or res.action == "escalate_human":
             eff.append("Queued for a person to review")
         if r.get("route_to_ae_id"):
-            eff.append(f'Routed to sales exec {r["route_to_ae_id"]} ({r.get("route_reason")})')
+            eff.append(f'Routed to sales exec {r["route_to_ae_id"]}: {ROUTE_TEXT.get(r.get("route_reason"), r.get("route_reason"))}')
         kinds = {a["kind"] for a in trail}
         if "crm_conflict_reread" in kinds:
             eff.insert(0, "The CRM said the record changed (409): the system re-read it and re-decided on the fresh state before writing")
@@ -181,7 +316,7 @@ def _compose(fid, title, story, label, orch, ev, res, v0, v1, calls=()) -> dict:
     out = {"id": fid, "title": title, "story": story, "label": label, "stages": st, "group": "crm" if fid in CRM_FLOWS else "core", "calls": log,
            "ledger": {k: list(v) for k, v in orch.mocks.ledger.items() if v},
            "audit": [{"kind": a["kind"], "ts": a["ts"], "detail": _short(a["detail"])} for a in trail],
-           "final": {"action": res.final_action or res.action, "codes": list(res.reason_codes), "text": act[0]}}
+           "final": {"action": res.final_action or res.action, "codes": list(res.reason_codes), "text": act[0]}, "account": card}
     if fid == "F2":
         out["contradiction"] = {"text": text, "claude_label": ai.get("label"), "claude_confidence": ai.get("confidence"),
                                 "guard": "G001" in (ai.get("codes") or []), "final_action": res.action}
@@ -191,14 +326,137 @@ def _compose(fid, title, story, label, orch, ev, res, v0, v1, calls=()) -> dict:
 def flows_payload() -> dict:
     golden = {g["id"]: g for g in scenario.load_golden()}
     out = []
+    lent = _lend_all()
     for fid, title, story, gid, idx, label in FLOWS:
         g, llm = copy.deepcopy(golden[gid]), None
         if fid == "F2":
             g["events"][0]["payload"]["body_text"] = GUARD_TEXT
             llm = FixtureLLM({GUARD_TEXT: reply_output("interested", GUARD_TEXT, {"interest_level": "high"}, 0.93)})
-        orch, ev, res, v0, v1, calls = _run(g, idx, llm)
-        out.append(_compose(fid, title, story, label, orch, ev, res, v0, v1, calls))
+        if fid == "F15":
+            g["events"][0]["payload"]["body_text"] = BROKEN_TEXT
+            llm = _CutOffLLM()
+        orch, ev, res, v0, v1, calls, card = _run(g, idx, llm, lent[fid], settle_prior=fid not in NO_SETTLE)
+        out.append(_compose(fid, title, story, label, orch, ev, res, v0, v1, calls, card))
     return {"label": RECORDED, "flows": out, "guard_text": GUARD_TEXT, "coordination": COORDINATION, "plain": {"actions": plain.ACTIONS}}
+
+
+# ------------------------------------------------------------------------------------------------------------------
+# Leads: twelve companies from the sample world (four per group), each run through the real engine as a new target, so the page
+# can show a lead the way a person would read it: the score and why, what the rules decided, the CRM record and the opening line.
+LEAD_TIERS = {"A": 4, "B": 4, "C": 4}
+
+
+def _why_not(f: dict, a: dict, now) -> str | None:
+    if not f["is_verified"]:
+        return "not verified"
+    if now - parse(f["observed_at"]) > timedelta(days=365):
+        return "older than a year"
+    if a["name"] not in f["text"]:
+        return "not about this company"
+    return None if ai_draft.usable_facts([f], a, now) else "clashes with the CRM"
+
+
+def _lead(aid: str, w: dict, sample: dict, golden: dict, now) -> dict:
+    a = next(x for x in w["accounts"] if x["account_id"] == aid)
+    g = copy.deepcopy(golden["G040"])
+    g["state"] = {"accounts": [a], "contacts": w["contacts"].get(aid, []), "company_facts": w["facts"].get(aid, []),
+                  **{n: [r for r in rs if r["account_id"] == aid] for n, rs in sample.items()}}
+    g["events"] = g["events"][:1]
+    g["events"][0]["account_id"] = aid
+    orch = scenario.build(g)
+    orch.score_cfg = {**orch.score_cfg, "gate_enabled": True}
+    card = _card(orch, aid)
+    res = orch.process(g["events"][0])
+    held = orch.pending_approvals()
+    final = res.final_action or res.action
+    contact = card["contact"]
+    facts = card["facts"]
+    act = plain.ACTIONS.get(final, [final, ""])
+    return {"id": aid, "account": card, "contact": {"name": contact["name"], "title": contact["title"]},
+            "facts": facts, "decision": {"action": final, "text": act[0], "what": act[1], "codes": [plain.CODES.get(c, c) for c in res.reason_codes]},
+            "draft": ({"step": held[0]["step"], "subject": held[0]["subject"], "body": held[0]["body"], "ai": held[0]["mode"] != "generic" and bool(held[0]["claims"]),
+                       "claims": held[0]["claims"]} if held else None),
+            "usable": sum(1 for f in facts if not f["why_not"]), "audit": [x["kind"] for x in orch.audit.trail(account_id=aid)]}
+
+
+def leads_payload() -> dict:
+    """Twelve leads, four per group. Three of each group follow the normal path (A and B: an outreach email is prepared; C: nurture) and
+    one shows another outcome the rules can reach (waiting, needs better data, do not contact), so the page shows more than the happy path."""
+    w, now, cfg, pol = _world(), parse("2026-10-01T16:00:00Z"), scoring.load_config(), Policy.load()
+    golden = {g["id"]: g for g in scenario.load_golden()}
+    sample = {n: _jsonl(SAMPLE / f"{n}.jsonl") for n in ("opportunities", "outreach_history", "suppression")}
+    skip = {x[0]["account_id"] for x in _lend_all().values()}
+    main, other, countries = {t: [] for t in "ABC"}, {t: None for t in "ABC"}, {}
+    for a in sorted(w["accounts"], key=lambda x: x["account_id"]):
+        aid, fs = a["account_id"], w["facts"].get(a["account_id"], [])
+        if (aid in skip or a["crm_status"] != "prospect" or a["industry"] in pol.non_icp_industries or (a["employee_count"] or 0) < pol.icp_min_employees
+                or not any(c["language"] == "en" and c["email_status"] == "valid" for c in w["contacts"].get(aid, []))):
+            continue
+        t = scoring.score(scoring.features(a, fs, cfg), cfg)["tier"]
+        if len(main[t]) >= 3 and other[t] is not None:
+            if all(len(main[x]) >= 3 and other[x] is not None for x in "ABC"):
+                break
+            continue
+        if t != "C" and not ai_draft.usable_facts(fs, a, now):
+            continue
+        lead = _lead(aid, w, sample, golden, now)
+        normal = lead["decision"]["action"] == ("nurture" if t == "C" else "contact")
+        if normal and len(main[t]) < 3 and countries.get((t, a["country"]), 0) < 2:
+            main[t].append(lead)
+            countries[(t, a["country"])] = countries.get((t, a["country"]), 0) + 1
+        elif not normal and other[t] is None:
+            other[t] = lead
+    return {"label": "Each lead below is a synthetic company from the sample world, run through the real engine as a new target. The model's answer is an offline fixture; nothing is sent.",
+            "leads": [l for t in "ABC" for l in main[t] + [other[t]] if l]}
+
+
+# ------------------------------------------------------------------------------------------------------------------
+REPLAY_POINTS = 300
+BUCKET_OF = {"wait": "wait", "enrich": "lookup", "handoff_ae": "sales", "escalate_human": "review", "suppress": "blocked"}
+HANDLING_GROUP = {"ignore_duplicate": "dup", "dedupe_by_content": "dup", "retry_then_process": "retry", "reconcile_before_retry": "retry",
+                  "process_and_reconcile": "retry", "reread_and_reevaluate": "retry", "dead_letter": "dead", "dead_letter_and_alert": "dead"}
+
+
+def replay_payload(world: Path = GENERATED) -> dict:
+    """The month as the engine saw it, in the order the events arrived, for the Command Center's "Play the month".
+
+    Each company is counted once, when its first event arrives, under the decision the engine takes for it (the same decisions the
+    Command Center totals show). The event counters (duplicates, retries, dead letters) come from the real run of the whole stream."""
+    cfg, policy, now = scoring.load_config(), Policy.load(), parse("2026-10-01T16:00:00Z")
+    conn = db.connect()
+    db.load_world_dir(conn, world)
+    facts = {}
+    for f in db.rows(conn, "SELECT * FROM company_facts ORDER BY fact_id"):
+        facts.setdefault(f["account_id"], []).append(f)
+    outcome = {}
+    for a in db.rows(conn, "SELECT * FROM accounts ORDER BY account_id"):
+        d = decide(conn, a["account_id"], now, policy)
+        if d.action == "contact":
+            tier = scoring.score(scoring.features(a, facts.get(a["account_id"], []), cfg), cfg)["tier"]
+            outcome[a["account_id"]] = "nurture" if tier == "C" and cfg["gate_enabled"] else "email"
+        else:
+            outcome[a["account_id"]] = BUCKET_OF.get(d.action, "wait")
+    conn.close()
+    _, events, _, res = _stream_run(world)
+    cols = ["events", "day", "email", "nurture", "wait", "lookup", "sales", "review", "blocked", "dup", "retry", "dead"]
+    cnt, seen, rows_, step = Counter(), set(), [], max(1, math.ceil(len(events) / REPLAY_POINTS))
+    for i, (e, r) in enumerate(zip(events, res), 1):
+        aid = e["account_id"]
+        if aid in outcome and aid not in seen:
+            seen.add(aid)
+            cnt[outcome[aid]] += 1
+        g = HANDLING_GROUP.get(r.handling)
+        if g:
+            cnt[g] += 1
+        if i % step == 0 or i == len(events):
+            rows_.append([i, e["received_at"][:10]] + [cnt[c] for c in cols[2:]])
+    for aid, b in outcome.items():                              # a company with no event of its own still gets counted at the end
+        if aid not in seen:
+            cnt[b] += 1
+    rows_[-1] = [rows_[-1][0], rows_[-1][1]] + [cnt[c] for c in cols[2:]]
+    return {"label": "Recorded run of the real engine over the whole month: the 55,959 events of the 50,000 synthetic companies, in the order they "
+                     "arrived (model answers: an offline fixture). Nothing is sent.",
+            "cols": cols, "rows": rows_, "total_events": len(events), "accounts": len(outcome)}
 
 
 # ------------------------------------------------------------------------------------------------------------------
@@ -320,6 +578,15 @@ def approvals_payload(world: Path = GENERATED, batch: int = BATCH) -> dict:
 
 
 # ------------------------------------------------------------------------------------------------------------------
+def _wilson(k: int, n: int, z: float = 1.96) -> tuple[float, float]:
+    """95% Wilson interval for a rate of k events in n trials."""
+    if n == 0:
+        return 0.0, 1.0
+    p, d = k / n, 1 + z * z / n
+    c, a = p + z * z / (2 * n), z * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n))
+    return (c - a) / d, (c + a) / d
+
+
 def measurement_payload(world: Path = GENERATED, aa_runs: int = 40) -> dict:
     """The measurement plan's worked example as data, from the SIMULATED experiment (assumptions in funnel_assumptions.json)."""
     from generator import impact
@@ -340,9 +607,17 @@ def measurement_payload(world: Path = GENERATED, aa_runs: int = 40) -> dict:
     for name, f, lim in (("Unsubscribe rate", "unsubscribed", g["unsubscribe_rate_max"]), ("Spam complaint rate", "complaint", g["spam_complaint_rate_max"]),
                          ("Hard bounce rate", "hard_bounce", g["hard_bounce_rate_max"])):
         t, c = rate(T, f, "contacted"), rate(C, f, "contacted")
-        guard.append({"name": name, "control": f"{c:.2%}", "treatment": f"{t:.2%}", "limit": f"{lim:.2%} or less", "status": "ok" if t <= lim else "breach"})
+        kt, nt = sum(r[f] for r in T if r["contacted"]), sum(1 for r in T if r["contacted"])
+        kc, nc = sum(r[f] for r in C if r["contacted"]), sum(1 for r in C if r["contacted"])
+        lo_t, hi_t = _wilson(kt, nt)
+        # A single rate is not enough to call a guardrail broken: with few events the 95% interval can include the limit.
+        guard.append({"name": name, "control": f"{c:.2%}", "treatment": f"{t:.2%}", "limit": f"{lim:.2%} or less", "status": "ok" if t <= lim else "breach",
+                      "limit_pct": round(100 * lim, 3), "events": {"control": kc, "treatment": kt}, "contacted": {"control": nc, "treatment": nt},
+                      "ci_pct": [round(100 * lo_t, 3), round(100 * hi_t, 3)],
+                      "evidence": "go" if hi_t < lim else ("stop" if lo_t > lim else "hold")})
     vt, vc = sum(r["violation"] for r in T), sum(r["violation"] for r in C)
-    guard.append({"name": "Contacted an ineligible account", "control": str(vc), "treatment": str(vt), "limit": "0 in treatment", "status": "ok" if vt == 0 else "breach"})
+    guard.append({"name": "Contacted an ineligible account", "control": str(vc), "treatment": str(vt), "limit": "0 in treatment", "status": "ok" if vt == 0 else "breach",
+                  "events": {"control": vc, "treatment": vt}, "evidence": "go" if vt == 0 else "stop"})
     pc = sum(r["sql"] for r in C) / len(C)
     power = [{"lift": f"+{l:.0%}", "per_arm": impact.sample_size_two_proportions(pc, pc * (1 + l)),
               "months": round(impact.sample_size_two_proportions(pc, pc * (1 + l)) / 25_000, 1)} for l in (0.10, 0.25, 0.50, 1.00, 2.00)]

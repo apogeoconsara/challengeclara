@@ -57,6 +57,60 @@ class Flows(unittest.TestCase):
         self.assertEqual(published, json.loads(json.dumps(showcase.flows_payload(), default=str)),
                          "run: python -m orchestrator export-web")
 
+    def test_scenario_companies_are_told_apart_by_the_score(self):
+        tiers = {f["id"]: f["account"]["tier"] for f in self.flows.values()}
+        self.assertEqual({tiers[k] for k in ("F10", "F1")}, {"A"})
+        self.assertEqual(tiers["F9"], "C")
+        self.assertEqual(self.flows["F9"]["final"]["action"], "nurture")          # a weaker fit: no email, no AI call
+        self.assertGreater(len({f["account"]["name"] for f in self.flows.values()}), 8)
+        for f in self.flows.values():                                              # the demo companies are never the bare golden ones
+            self.assertNotRegex(f["account"]["name"], r"^Dorada \d+$")
+
+    def test_leads_cover_every_group_and_follow_the_rules(self):
+        leads = showcase.leads_payload()["leads"]
+        by = {t: [l for l in leads if l["account"]["tier"] == t] for t in "ABC"}
+        self.assertEqual({t: len(v) for t, v in by.items()}, {"A": 4, "B": 4, "C": 4})
+        for l in leads:
+            a = l["account"]
+            self.assertEqual(a["score"], sum(a["parts"].values()))
+            self.assertEqual(a["tier"], "A" if a["score"] >= a["tier_a"] else "B" if a["score"] >= a["tier_b"] else "C")
+            if a["tier"] == "C" and l["decision"]["action"] == "nurture":
+                self.assertIsNone(l["draft"])                                      # nurture: no email, no AI call
+            if l["draft"] and l["draft"]["ai"]:
+                self.assertTrue(l["draft"]["claims"])                              # an AI-written line always cites a fact
+                self.assertGreater(l["usable"], 0)
+
+    def test_published_leads_are_current(self):
+        published = json.loads((REPO / "public/data/leads.json").read_text(encoding="utf-8"))
+        self.assertEqual(published, json.loads(json.dumps(showcase.leads_payload(), default=str)), "run: python -m orchestrator export-web")
+
+    def test_eligibility_and_routing_scenarios(self):
+        f = self.flows
+        self.assertEqual((f["F11"]["final"]["action"], f["F11"]["final"]["codes"]), ("suppress", ["CUSTOMER"]))
+        self.assertEqual(f["F11"]["account"]["crm"]["status"], "customer")
+        self.assertEqual((f["F12"]["final"]["action"], f["F12"]["final"]["codes"]), ("suppress", ["ACTIVE_OPPORTUNITY"]))
+        self.assertEqual(f["F12"]["account"]["crm"]["open_deals"], 1)
+        self.assertEqual(f["F13"]["final"]["action"], "handoff_ae")
+        self.assertTrue(any("owner is away" in l for s in f["F13"]["stages"] for l in s["lines"]), "the backup routing should be explained")
+        for k in ("F11", "F12"):                                                  # decided by rules alone: no model, no email, no score
+            self.assertEqual({s["id"]: s["status"] for s in f[k]["stages"]}["model"], "skipped")
+
+    def test_a_late_unsubscribe_cancels_the_waiting_draft(self):
+        f = self.flows["F14"]
+        self.assertEqual((f["final"]["action"], f["final"]["codes"]), ("suppress", ["UNSUBSCRIBED"]))
+        self.assertEqual(f["account"]["crm"]["drafts_waiting"], 1)                # the draft was still waiting when the opt-out arrived
+        self.assertTrue(any("Out of order" in l for l in f["stages"][0]["lines"]))
+        self.assertTrue(any("cancelled" in l for l in f["stages"][-2]["lines"]))
+        self.assertFalse([c for c in f["calls"] if c["system"] == "send"], "nothing may reach the outreach system")
+
+    def test_a_cut_off_ai_answer_goes_to_a_person(self):
+        f = self.flows["F15"]
+        self.assertEqual((f["final"]["action"], f["final"]["codes"]), ("escalate_human", ["AI_INVALID_OUTPUT"]))
+        by = {s["id"]: s for s in f["stages"]}
+        self.assertEqual(by["validator"]["status"], "flag")
+        self.assertIn("cut off", by["model"]["headline"])
+        self.assertIn("SIMULATED", f["label"])                                    # the defect is a recorded one, never passed off as live
+
     def test_validator_codes_have_everyday_text(self):
         for c in ("G001", "V010", "V011", "V006"):
             self.assertIn(c, plain.VALIDATION_CODES)
@@ -103,6 +157,20 @@ class Measurement(unittest.TestCase):
         self.assertEqual(stages, sorted(stages, reverse=True))
         self.assertTrue(all(g["status"] in ("ok", "breach") for g in m["guardrails"]))
         self.assertIn("SIMULATED", m["label"])
+
+    def test_guardrails_carry_their_counts_and_an_interval_that_decides_the_state(self):
+        for g in self.m["guardrails"]:
+            self.assertIn(g["evidence"], ("go", "hold", "stop"), g["name"])
+            if "ci_pct" not in g:                      # the ineligible-contact guardrail has a limit of zero events
+                self.assertEqual(g["evidence"], "go" if g["events"]["treatment"] == 0 else "stop")
+                continue
+            lo, hi = g["ci_pct"]
+            self.assertLessEqual(lo, 100 * g["events"]["treatment"] / g["contacted"]["treatment"])
+            self.assertLessEqual(100 * g["events"]["treatment"] / g["contacted"]["treatment"], hi)
+            self.assertEqual(g["evidence"], "go" if hi < g["limit_pct"] else "stop" if lo > g["limit_pct"] else "hold", g["name"])
+        spam = next(g for g in self.m["guardrails"] if g["name"] == "Spam complaint rate")
+        self.assertEqual((spam["status"], spam["evidence"]), ("breach", "hold"),
+                         "a point estimate over the limit with an interval that includes it reads HOLD, not broken")
 
     def test_it_matches_the_worked_example_in_the_reports(self):
         text = (ROOT_DIR / "data/reports/impact_example.md").read_text(encoding="utf-8")
@@ -230,3 +298,22 @@ class Approvals(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+class MonthReplay(unittest.TestCase):
+    @unittest.skipUnless(GENERATED.exists(), "50k world not generated (make data)")
+    def test_the_replay_ends_on_the_command_center_totals(self):
+        r = showcase.replay_payload()
+        ov = json.loads((REPO / "public/data/overview.json").read_text(encoding="utf-8"))
+        last = dict(zip(r["cols"], r["rows"][-1]))
+        self.assertEqual(last["events"], r["total_events"])
+        self.assertEqual(sum(last[k] for k in ("email", "nurture", "wait", "lookup", "sales", "review", "blocked")), ov["n_accounts"])
+        self.assertEqual(last["sales"], ov["actions"]["handoff_ae"])
+        self.assertEqual(last["review"], ov["actions"]["escalate_human"])
+        self.assertEqual(last["blocked"], ov["actions"]["suppress"])
+        self.assertEqual(last["wait"], ov["actions"]["wait"])
+        self.assertEqual(last["email"] + last["nurture"], ov["actions"]["contact"])
+        self.assertEqual(json.loads((REPO / "public/data/replay.json").read_text(encoding="utf-8")), json.loads(json.dumps(r)),
+                         "run: python -m orchestrator export-overview")
+        for a, b in zip(r["rows"], r["rows"][1:]):                  # a running count never goes down
+            self.assertTrue(all(y >= x for x, y in zip(a[2:], b[2:])))
+

@@ -164,7 +164,7 @@ def export_all() -> list[Path]:
     written = []
     for name, payload in (("runs.json", runs()), ("stream.json", stream()), ("evals.json", evals_payload()),
                           ("cases.json", cases_payload()), ("scoring.json", scoring_payload()),
-                          ("flows.json", showcase.flows_payload()),
+                          ("flows.json", showcase.flows_payload()), ("leads.json", showcase.leads_payload()),
                           ("challenge_map.json", showcase.challenge_map_payload())):
         p = WEB / name
         p.write_text(json.dumps(payload, ensure_ascii=False, separators=(",", ":"), default=str), encoding="utf-8")
@@ -224,7 +224,7 @@ def export_overview() -> list[Path]:
     out = []
     for name, payload in (("overview.json", overview_payload()), ("operations.json", showcase.operations_payload()),
                           ("approvals.json", showcase.approvals_payload()),
-                          ("measurement.json", showcase.measurement_payload()),
+                          ("measurement.json", showcase.measurement_payload()), ("replay.json", showcase.replay_payload()),
                           ("scoring_compare.json", showcase.scoring_compare_payload())):
         p = WEB / name
         p.write_text(json.dumps(payload, ensure_ascii=False, separators=(",", ":"), default=str), encoding="utf-8")
