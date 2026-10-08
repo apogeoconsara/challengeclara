@@ -42,7 +42,7 @@ await page.click("#leadBack");
 
 // 2. Scenarios: every one draws its company, its score and its journey; the animation runs on its own and is instant the second time
 await page.click('#runTabs [data-rt="scn"]');
-assert.equal((await page.$$("#scnPick .pill")).length, 11);
+assert.equal((await page.$$("#scnPick .pill")).length, 16);
 await page.click('#scnPick .pill[data-id="F4"]');
 await page.waitForFunction(() => document.querySelectorAll("#scnJr .st.on").length === document.querySelectorAll("#scnJr .st").length, null, { timeout: 12000 });
 assert.match(await text("#scnJr"), /503 temporary error[\s\S]*200 ok/, "the retry with the same key should be visible");

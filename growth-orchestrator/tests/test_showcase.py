@@ -84,6 +84,33 @@ class Flows(unittest.TestCase):
         published = json.loads((REPO / "public/data/leads.json").read_text(encoding="utf-8"))
         self.assertEqual(published, json.loads(json.dumps(showcase.leads_payload(), default=str)), "run: python -m orchestrator export-web")
 
+    def test_eligibility_and_routing_scenarios(self):
+        f = self.flows
+        self.assertEqual((f["F11"]["final"]["action"], f["F11"]["final"]["codes"]), ("suppress", ["CUSTOMER"]))
+        self.assertEqual(f["F11"]["account"]["crm"]["status"], "customer")
+        self.assertEqual((f["F12"]["final"]["action"], f["F12"]["final"]["codes"]), ("suppress", ["ACTIVE_OPPORTUNITY"]))
+        self.assertEqual(f["F12"]["account"]["crm"]["open_deals"], 1)
+        self.assertEqual(f["F13"]["final"]["action"], "handoff_ae")
+        self.assertTrue(any("owner is away" in l for s in f["F13"]["stages"] for l in s["lines"]), "the backup routing should be explained")
+        for k in ("F11", "F12"):                                                  # decided by rules alone: no model, no email, no score
+            self.assertEqual({s["id"]: s["status"] for s in f[k]["stages"]}["model"], "skipped")
+
+    def test_a_late_unsubscribe_cancels_the_waiting_draft(self):
+        f = self.flows["F14"]
+        self.assertEqual((f["final"]["action"], f["final"]["codes"]), ("suppress", ["UNSUBSCRIBED"]))
+        self.assertEqual(f["account"]["crm"]["drafts_waiting"], 1)                # the draft was still waiting when the opt-out arrived
+        self.assertTrue(any("Out of order" in l for l in f["stages"][0]["lines"]))
+        self.assertTrue(any("cancelled" in l for l in f["stages"][-2]["lines"]))
+        self.assertFalse([c for c in f["calls"] if c["system"] == "send"], "nothing may reach the outreach system")
+
+    def test_a_cut_off_ai_answer_goes_to_a_person(self):
+        f = self.flows["F15"]
+        self.assertEqual((f["final"]["action"], f["final"]["codes"]), ("escalate_human", ["AI_INVALID_OUTPUT"]))
+        by = {s["id"]: s for s in f["stages"]}
+        self.assertEqual(by["validator"]["status"], "flag")
+        self.assertIn("cut off", by["model"]["headline"])
+        self.assertIn("SIMULATED", f["label"])                                    # the defect is a recorded one, never passed off as live
+
     def test_validator_codes_have_everyday_text(self):
         for c in ("G001", "V010", "V011", "V006"):
             self.assertIn(c, plain.VALIDATION_CODES)

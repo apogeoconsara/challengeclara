@@ -1149,8 +1149,10 @@ function plainKey(k) {
 const RUN = { timers: [] };
 const RDONE = store.get("orch.runDone") || {};                         // scenarios whose animation already ran (shown at once next time)
 const SCN_LIVE = store.get("orch.scnLive") || {};                      // the last live answer per lead or scenario
-const SCN_GROUPS = [["A normal day", ["F10", "F0", "F9", "F1"]], ["The AI has to be careful", ["F2", "F5"]], ["The same event twice", ["F3"]], ["When a system fails", ["F4", "F6", "F7", "F8"]]];
-const SCN_SHORT = { F0: "New target · Standard", F1: "Prospect is interested", F2: "“Interested, but stop”", F3: "Same webhook twice", F4: "Email API fails", F5: "Vague reply", F6: "CRM fails (503)", F7: "CRM says “unknown”", F8: "CRM changed (409)", F9: "Weaker fit → nurture", F10: "New target · Top priority" };
+const SCN_GROUPS = [["A normal day", ["F10", "F0", "F9", "F1"]], ["The AI has to be careful", ["F2", "F5", "F15"]], ["Who must not be contacted", ["F11", "F12"]], ["Routing to a sales exec", ["F13"]],
+  ["The same event twice, or late", ["F3", "F14"]], ["When a system fails", ["F4", "F6", "F7", "F8"]]];
+const SCN_SHORT = { F0: "New target · Standard", F1: "Prospect is interested", F2: "“Interested, but stop”", F3: "Same webhook twice", F4: "Email API fails", F5: "Vague reply", F6: "CRM fails (503)", F7: "CRM says “unknown”", F8: "CRM changed (409)", F9: "Weaker fit → nurture", F10: "New target · Top priority",
+  F11: "Current customer", F12: "Open deal", F13: "Owner on leave → backup", F14: "Unsubscribe arrives late", F15: "AI output cut off" };
 const SCN_AI = {
   F0: [1, "The rules said yes. The company had a verified, recent fact, so Claude wrote one opening line from it and the validator checked that it cites that fact. The rest of the email is a fixed template."],
   F1: [1, "Without AI a person would read every reply. Claude read free text and pulled out size, tools and timeline. Then the rules chose the next step: it proposed, they decided."],
@@ -1163,6 +1165,11 @@ const SCN_AI = {
   F8: [1, "The conflict triggers a fresh read and a new decision before anything is written; Claude then wrote the opening line from a verified fact. The AI helps with the email; the rules and the CRM keep it safe."],
   F9: [0, "No AI by design. Even with a usable fact, a weaker-fit company gets no email and no model call: the score decides and only the enrolment is recorded. The AI is spent where it can matter."],
   F10: [1, "Verified facts exist, so Claude wrote the opening line from one of them. The validator checked that every claim cites a real fact, and the draft waits for a person."],
+  F11: [0, "No AI. A customer is excluded by a rule before anything else, so there is no model call and no email."],
+  F12: [0, "No AI. A deal in negotiation belongs to its sales exec, so the rules stop outreach from the SDR side."],
+  F13: [0, "No AI. Choosing the sales exec (the owner, then the owner's backup, then territory, then who has room) is a deterministic rule: the AI never picks who gets an account."],
+  F14: [0, "No AI. The late opt-out is reconciled against the account's history by the rules, and it cancels the draft that was waiting for approval. This is the case where a person could otherwise approve an email to someone who already opted out."],
+  F15: [1, "The model failed here, not the system: its answer came back cut off twice. The validator refused to use it and a person reads the reply instead. The AI never acts on output that does not pass. The live button asks the real model to read this same reply."],
 };
 const TIER_LABEL = { A: "Top priority", B: "Standard", C: "Nurture" };
 const SYS_NAME = { crm: ["🗄️", "CRM (HubSpot-style)"], send: ["✉️", "Email log"], enrich: ["🔎", "Enrichment"], calendar: ["📅", "Calendar"] };
@@ -1250,7 +1257,8 @@ function scnSteps(f) {
   out.push({ ic: "📥", who: "Webhook", h: by.event.headline, l: by.event.lines });
   out.push({ ic: "🗂️", who: "State", cls: dup ? "skip" : "", h: by.state.headline, l: by.state.lines, tags: dup ? [tag("duplicate", "warn")] : [] });
   out.push({ ic: "⚖️", who: "Rules", cls: by.rules.status === "skipped" ? "skip" : "", h: by.rules.headline, l: by.rules.lines.slice(0, 2), tags: [tag("deterministic")] });
-  out.push(dup || isReply ? { ic: "🏷️", who: "Score", cls: "skip", h: dup ? "Not needed for a duplicate" : "Not needed: a reply follows the reply rules, not the score", l: [`The company still scores ${a.score}/${a.max} (${TIER_LABEL[a.tier]}).`] }
+  const scored = f.final.action === "contact" || f.final.action === "nurture";
+  out.push(dup || isReply || !scored ? { ic: "🏷️", who: "Score", cls: "skip", h: dup ? "Not needed for a duplicate" : isReply ? "Not needed: a reply follows the reply rules, not the score" : "Not needed: the rules decided before the score", l: [`The company still scores ${a.score}/${a.max} (${TIER_LABEL[a.tier]}).`] }
     : { ic: "🏷️", who: "Score", h: `${a.score} points → ${TIER_LABEL[a.tier]}: ${a.tier === "C" ? "Nurture: no email, no AI" : "Personal outreach email"}`, l: [`size ${a.parts.size} + payment pain ${a.parts.pain} + signals ${a.parts.signals}. Scoring version ${a.version}.`], tags: [tag(TIER_LABEL[a.tier], a.tier === "A" ? "good" : a.tier === "B" ? "acc" : "")] });
   const ms = by.model.status;
   out.push({ ic: "✨", who: "Claude", cls: ms === "skipped" ? "skip" : "ai", h: by.model.headline, l: by.model.lines, tags: [ms === "skipped" ? tag("not needed") : tag("✨ AI", "acc"), ...(ms !== "skipped" ? [tag("proposes only")] : [])] });
@@ -1269,10 +1277,10 @@ function scnDraw() {
   stopRun();
   const fl = DATA.flows, id = fl.flows.some(x => x.id === state.runFlow) ? state.runFlow : "F10", f = fl.flows.find(x => x.id === id), a = f.account, sim = /SIMULATED/.test(f.label);
   document.querySelectorAll("#scnPick .pill").forEach(b => b.classList.toggle("active", b.dataset.id === id));
-  $("#scnStory").innerHTML = `${esc(f.story)} ${sim ? tag("simulated model mistake", "warn") : tag("recorded run of the real engine", "good")}`;
+  $("#scnStory").innerHTML = `${esc(f.story)} ${sim ? tag(/defect/.test(f.label) ? "simulated defect" : "simulated model mistake", "warn") : tag("recorded run of the real engine", "good")}`;
   const mk = 100 * a.score / a.max, pct = v => 100 * v / a.max, usable = a.facts.filter(x => !x.why_not).length;
   $("#scnCo").innerHTML = `<div class="d">The company</div><h3>${esc(a.name)}</h3><div class="d">${esc(a.country)} · ${esc(a.industry)} · ${a.employees} employees · synthetic</div>
-    <div class="d" style="margin-top:10px"><b>CRM record (mock)</b></div><div class="kv"><span>Status</span><span>${esc(a.crm.status.replaceAll("_", " "))}</span><span>Owner</span><span>${a.crm.owner_ae ? esc(a.crm.owner_ae) : "none yet"}</span><span>Contacts</span><span>${a.crm.contacts}</span><span>Open deals</span><span>${a.crm.open_deals}</span><span>Emails so far</span><span>${a.crm.emails_so_far}</span><span>Opted out</span><span>${a.crm.suppressed ? "yes" : "no"}</span></div>
+    <div class="d" style="margin-top:10px"><b>CRM record (mock)</b></div><div class="kv"><span>Status</span><span>${esc(a.crm.status.replaceAll("_", " "))}</span><span>Owner</span><span>${a.crm.owner_ae ? esc(a.crm.owner_ae) : "none yet"}</span><span>Contacts</span><span>${a.crm.contacts}</span><span>Open deals</span><span>${a.crm.open_deals}</span><span>Emails so far</span><span>${a.crm.emails_so_far}</span><span>Opted out</span><span>${a.crm.suppressed ? "yes" : "no"}</span><span>Drafts waiting</span><span>${a.crm.drafts_waiting}</span></div>
     <div class="d"><b>Score</b> · picks the track</div>
     <div class="meter"><div class="mk" style="left:${mk}%">${a.score}</div><i style="width:${pct(a.tier_b)}%;background:#CBD2E1"></i><i style="width:${pct(a.tier_a - a.tier_b)}%;background:#9DB5F8"></i><i style="flex:1;background:#7FD3A0"></i></div>
     <div class="d" style="display:flex;justify-content:space-between"><span>Nurture 0–${a.tier_b - 1}</span><span>Standard ${a.tier_b}–${a.tier_a - 1}</span><span>Top ${a.tier_a}+</span></div>

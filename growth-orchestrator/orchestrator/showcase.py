@@ -32,6 +32,8 @@ ROOT = Path(__file__).resolve().parent.parent
 GENERATED = ROOT / "data" / "generated"
 GUARD_TEXT = "I'm interested, but don't email me again."
 RECORDED = "Recorded run of the real engine. The model's answer is an offline fixture (a deterministic stand-in), not a live call."
+BROKEN = ("Recorded run of the real engine. The model's answer is a SIMULATED defect: we hand the engine a cut-off answer taken from the recorded "
+          "suite, because a strong model rarely breaks like this. The live button asks the real model to read the same reply.")
 SIMULATED = ("Recorded run of the real engine. The model's answer is a SIMULATED mistake: we hand the engine an \"interested\" answer, "
              "because a strong model usually gets this reply right. Use the live button to see what Claude really says.")
 
@@ -48,7 +50,13 @@ FLOWS = [
     ("F8", "The CRM record changed meanwhile (409)", "The decision is re-made on the fresh state before the system writes.", "G112", 0, RECORDED),
     ("F9", "A weaker-fit company is added", "The score sends it to the slow nurture track: no email and no AI call, only the enrolment is recorded.", "G040", 0, RECORDED),
     ("F10", "A strong-fit company is added", "Verified facts exist, so the AI writes the opening line. The validator checks it, and the draft waits for a person.", "G080", 0, RECORDED),
+    ("F11", "A current customer is targeted", "The rules stop it before anything else: a customer is never prospected.", "G003", 0, RECORDED),
+    ("F12", "The company has an open deal", "A deal in negotiation belongs to its sales exec: no outreach from the SDR side.", "G006", 0, RECORDED),
+    ("F13", "The account owner is on leave", "The sales exec who owns the account is away, so the engine routes it to the backup.", "G101", 0, RECORDED),
+    ("F14", "An unsubscribe arrives a day late", "The opt-out happened before the email was drafted but arrived after it. The draft waiting for approval is cancelled.", "G047", 1, RECORDED),
+    ("F15", "The AI answers with broken output", "The model's answer is cut off, twice. The system does not guess: a person reads the reply.", "G068", 0, BROKEN),
 ]
+NO_SETTLE = {"F14"}                                  # the draft must still be waiting when the late event arrives
 # The golden companies are all alike (120 employees, no facts, a plain 30 points), which makes a demo look empty. For the demo each
 # scenario keeps its golden's mock behaviour (the CRM that fails, the webhook that repeats) but is lent a company from the committed
 # sample world, with its own facts and contact. `WHO` says which kind of company each scenario needs.
@@ -57,6 +65,8 @@ WHO = {"F10": {"tier": "A", "facts": 2}, "F0": {"tier": "B", "facts": 1}, "F4": 
        "F6": {"tier": "B", "facts": 1}, "F7": {"tier": "B", "facts": 1}, "F9": {"tier": "C", "facts": 1},
        "F1": {"tier": "A", "emp": (100, 140)}, "F2": {"tier": "B"}, "F5": {"tier": "B"}}
 WHO["F3"] = WHO["F0"]
+WHO.update({"F11": {"tier": "B"}, "F12": {"tier": "B"}, "F13": {"tier": "B"}, "F14": {"tier": "B", "facts": 1}, "F15": {"tier": "B"}})
+BROKEN_TEXT = "Thanks, but this quarter we're closing our budget. Write to me after November 24."
 IDENTITY = ("name", "legal_name", "domain", "country", "industry", "employee_count", "employee_band", "revenue_band", "international_signal")
 _WORLD: dict = {}
 
@@ -93,7 +103,7 @@ def _lend(fid: str, taken: set) -> tuple[dict, list, dict] | None:
 
 def _lend_all() -> dict:
     taken, out = set(), {}
-    for fid in ["F10", "F0", "F4", "F8", "F6", "F7", "F9", "F1", "F2", "F5"]:
+    for fid in ["F10", "F0", "F4", "F8", "F6", "F7", "F9", "F1", "F2", "F5", "F11", "F12", "F13", "F14", "F15"]:
         a, fs, c = _lend(fid, taken)
         out[fid] = (a, fs, c)
         taken.add(a["account_id"])
@@ -135,6 +145,8 @@ def _stage(sid, name, status, headline, lines=()):
     return {"id": sid, "name": name, "status": status, "headline": headline, "lines": list(lines)}
 
 
+ROUTE_TEXT = {"OWNER": "the account owner", "OWNER_BACKUP": "the owner is away, so the backup", "TERRITORY": "the sales exec for its country with the most room",
+              "TERRITORY_FALLBACK": "no sales exec in its country has room, so one from another country"}
 REVIEWER = "demo reviewer (scripted stand-in for a person)"
 
 
@@ -142,6 +154,20 @@ def _settle(orch, ev) -> list[dict]:
     """The recorded runs include the human step: whatever the engine is holding is approved by a scripted reviewer, which is
     labelled as such everywhere it shows. Without it the engine would (correctly) stop at `pending_approval`."""
     return [orch.approve(p["key"], REVIEWER, now=parse(ev["received_at"])) for p in orch.pending_approvals()]
+
+
+class _CutOffLLM:
+    """Answers every reply with the same cut-off output from the recorded suite (what a model that stops mid-sentence would return)."""
+    mode, model = "fixture", "fixture"
+
+    def __init__(self):
+        rec = next(r for r in _jsonl(SEED_DIR / "llm_recordings.jsonl") if r["recording_id"] == "EV-R-NOW-01:truncated_json")
+        self.raw, self.calls = rec["model_output_raw"], []
+
+    def run(self, system, user, tool, max_tokens=700):
+        from .ai.llm import LLMResponse
+        self.calls.append(tool["name"])
+        return LLMResponse(self.raw, self.model, self.mode)
 
 
 def _card(orch, aid: str) -> dict:
@@ -158,7 +184,8 @@ def _card(orch, aid: str) -> dict:
             "crm": {"status": a["crm_status"], "owner_ae": a["crm_owner_ae_id"], "contacts": n("SELECT COUNT(*) FROM contacts WHERE account_id=?"),
                     "open_deals": n("SELECT COUNT(*) FROM opportunities WHERE account_id=? AND closed_at IS NULL"),
                     "emails_so_far": n("SELECT COUNT(*) FROM outreach_history WHERE account_id=? AND sender_type='automated'"),
-                    "suppressed": n("SELECT COUNT(*) FROM suppression WHERE account_id=?") > 0},
+                    "suppressed": n("SELECT COUNT(*) FROM suppression WHERE account_id=?") > 0,
+                    "drafts_waiting": n("SELECT COUNT(*) FROM actions WHERE account_id=? AND kind='email' AND status='pending_approval'")},
             "score": sc["score"], "tier": sc["tier"], "parts": sc["parts"], "version": cfg["version"],
             "size": feat["size"], "pain": feat["pain_text"], "signals": feat["signals"],
             "tier_a": cfg["tier_a"], "tier_b": cfg["tier_b"], "max": w["size"] + w["pain"] + cfg["signal_cap"] * w["signal_each"],
@@ -167,7 +194,7 @@ def _card(orch, aid: str) -> dict:
                        "why_not": _why_not(f, a, parse("2026-10-01T16:00:00Z"))} for f in facts]}
 
 
-def _run(g: dict, idx: int, llm=None, who=None):
+def _run(g: dict, idx: int, llm=None, who=None, settle_prior=True):
     aid0 = g["events"][0]["account_id"]
     if who:
         _overlay(g, who)
@@ -176,7 +203,8 @@ def _run(g: dict, idx: int, llm=None, who=None):
     aid = aid0
     for ev in g["events"][:idx]:
         orch.process(ev)
-        _settle(orch, ev)
+        if settle_prior:
+            _settle(orch, ev)
     ev, v0, n0 = g["events"][idx], state.version(orch.conn, aid), len(orch.mocks.calls)
     card = _card(orch, aid)
     res = orch.process(ev)
@@ -202,8 +230,10 @@ def _compose(fid, title, story, label, orch, ev, res, v0, v1, calls=(), card=Non
     final = res.action
     st = []
     text = (ev.get("payload") or {}).get("body_text")
+    late = (parse(ev["received_at"]) - parse(ev["occurred_at"])).total_seconds() / 3600
     st.append(_stage("event", "Event comes in", "done", plain.EVENTS.get(ev["type"], ev["type"]),
-                     [f'Delivery {ev["delivery_id"]}, source {ev.get("source", "?")}'] + ([f'"{text.strip()}"'] if text else [])))
+                     [f'Delivery {ev["delivery_id"]}, source {ev.get("source", "?")}'] + ([f'"{text.strip()}"'] if text else [])
+                     + ([f"Out of order: it happened {late:.0f} hours before it arrived, after the email draft was made"] if late > 1 else [])))
     if dup:
         st.append(_stage("state", "State changes", "skipped", f"Already processed: state stays at version {v0}", ["The delivery id was seen before."]))
         st.append(_stage("rules", "Rules decide", "skipped", "Nothing to decide: this is a duplicate"))
@@ -225,7 +255,11 @@ def _compose(fid, title, story, label, orch, ev, res, v0, v1, calls=(), card=Non
                              codes + (["Then the company's score picked the slow track instead of an email."] if res.action == "nurture" else [])
                              + ["Deterministic policy: no AI involved in this decision."]))
         if ai.get("used_ai") or (ai and ai.get("task") == "draft" and ai.get("used_ai")):
-            if reply:
+            if reply and ai.get("label") is None:
+                st.append(_stage("model", "Claude interprets", "done", "Claude's answer came back cut off",
+                                 [f'Source of this answer: {"a simulated defect (a cut-off answer from the recorded suite)" if fid == "F15" else "an offline stand-in for the model"}.',
+                                  "The system asked once more and got the same defect. It only proposes; it never picks the action."]))
+            elif reply:
                 conf = f' ({ai["confidence"]})' if ai.get("confidence") is not None else ""
                 st.append(_stage("model", "Claude interprets", "done", f'Claude reads the reply as "{ai.get("label")}"{conf}',
                                  [f'Source of this answer: {"a simulated model mistake" if fid == "F2" else "an offline stand-in for the model (not a live call)"}.', "It only proposes: label and extracted facts. It never picks the action."]))
@@ -237,6 +271,7 @@ def _compose(fid, title, story, label, orch, ev, res, v0, v1, calls=(), card=Non
         if ai and ai.get("used_ai"):
             codes = ai.get("codes") or []
             head = ("The rules overrode the model" if "G001" in codes else
+                    "Rejected twice: the output never matched the required structure" if ai.get("verdict") == "reject_retry" else
                     "Accepted: every claim cites a verified fact about the company" if ai.get("task") == "draft" and ai.get("verdict") == "accept"
                     else plain.VERDICTS.get(ai.get("verdict"), ai.get("verdict")))
             st.append(_stage("validator", "Validator checks", "done" if ai.get("verdict") in ("accept", "accept_with_warning") else "flag", head,
@@ -262,7 +297,7 @@ def _compose(fid, title, story, label, orch, ev, res, v0, v1, calls=(), card=Non
         if r.get("needs_human_review") or res.action == "escalate_human":
             eff.append("Queued for a person to review")
         if r.get("route_to_ae_id"):
-            eff.append(f'Routed to sales exec {r["route_to_ae_id"]} ({r.get("route_reason")})')
+            eff.append(f'Routed to sales exec {r["route_to_ae_id"]}: {ROUTE_TEXT.get(r.get("route_reason"), r.get("route_reason"))}')
         kinds = {a["kind"] for a in trail}
         if "crm_conflict_reread" in kinds:
             eff.insert(0, "The CRM said the record changed (409): the system re-read it and re-decided on the fresh state before writing")
@@ -297,7 +332,10 @@ def flows_payload() -> dict:
         if fid == "F2":
             g["events"][0]["payload"]["body_text"] = GUARD_TEXT
             llm = FixtureLLM({GUARD_TEXT: reply_output("interested", GUARD_TEXT, {"interest_level": "high"}, 0.93)})
-        orch, ev, res, v0, v1, calls, card = _run(g, idx, llm, lent[fid])
+        if fid == "F15":
+            g["events"][0]["payload"]["body_text"] = BROKEN_TEXT
+            llm = _CutOffLLM()
+        orch, ev, res, v0, v1, calls, card = _run(g, idx, llm, lent[fid], settle_prior=fid not in NO_SETTLE)
         out.append(_compose(fid, title, story, label, orch, ev, res, v0, v1, calls, card))
     return {"label": RECORDED, "flows": out, "guard_text": GUARD_TEXT, "coordination": COORDINATION, "plain": {"actions": plain.ACTIONS}}
 
