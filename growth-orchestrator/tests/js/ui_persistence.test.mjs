@@ -27,25 +27,45 @@ const go = async v => { await page.click(`#nav button[data-v="${v}"]`); await pa
 const goSec = async (group, sec) => { await go(group); await page.click(`[data-sec="${sec}"]`); await page.waitForTimeout(250); };
 const text = sel => page.$eval(sel, e => e.innerText);
 
-await page.goto(base + "#run"); await page.waitForSelector("#runGo");
+await page.goto(base + "#run"); await page.waitForSelector("#leadList tr.row");
 
-// 1. a finished flow is still there after visiting another tab
-await page.click("#runGo"); await page.click("#runSkip");
-assert.match(await text("#runCard"), /Result:/);
+// 1. Live Demo opens on the twelve leads, four per group; an open lead page survives a tab change and a reload
+assert.equal((await page.$$("#leadList tr.row")).length, 12);
+for (const t of ["A", "B", "C"]) assert.equal((await page.$$(`#leadList .tchip${t}`)).length, 4, `four leads in group ${t}`);
+await page.click('#leadList tr.row[data-i="2"]');
+assert.match(await text("#leadPage"), /Score \(ICP\)[\s\S]*Routing decision[\s\S]*CRM state/i);
 await go("overview"); await go("run");
-assert.match(await text("#runCard"), /Result:/, "finished flow lost after switching tabs");
+assert.match(await text("#leadPage"), /Routing decision/i, "the open lead was lost after switching tabs");
+await page.reload(); await page.waitForSelector("#leadPage .back");
+assert.match(await text("#leadPage"), /Routing decision/i, "the open lead was lost after a reload");
+await page.click("#leadBack");
 
-// 2. a run that is still animating keeps going while another tab is open
-await page.click('[data-run="F3"]'); await page.click("#runGo");
-await go("operations"); await page.waitForTimeout(11500); await go("run");
-assert.match(await text("#runCard"), /Result:/, "a run in progress stopped when the tab changed");
+// 2. Scenarios: every one draws its company, its score and its journey; the animation runs on its own and is instant the second time
+await page.click('#runTabs [data-rt="scn"]');
+assert.equal((await page.$$("#scnPick .pill")).length, 11);
+await page.click('#scnPick .pill[data-id="F4"]');
+await page.waitForFunction(() => document.querySelectorAll("#scnJr .st.on").length === document.querySelectorAll("#scnJr .st").length, null, { timeout: 12000 });
+assert.match(await text("#scnJr"), /503 temporary error[\s\S]*200 ok/, "the retry with the same key should be visible");
+assert.match(await text("#scnCo"), /Facts known/);
+await go("operations"); await go("run");
+assert.equal(await page.$$eval("#scnJr .st:not(.on)", e => e.length), 0, "a scenario already played should show at once");
 
-// 3. the model-vs-rules replay survives tab changes and a reload
-await page.click("#truthRun"); await page.waitForTimeout(4200);
-await goSec("decisions", "priority"); await go("run");
-assert.match(await text("#trio"), /SUPPRESS/, "replay lost after switching tabs");
-await page.reload(); await page.waitForSelector("#trio");
-assert.match(await text("#trio"), /SUPPRESS/, "replay lost after a reload");
+// 3. each scenario has a live Claude panel: a reply for the reply scenarios, an opening line for the others
+const liveReply = { task: "reply", model: "m", crm_state: "prospect", received_date: "2026-10-01", label: "not_now", confidence: 0.9, verdict: "accept", violation_codes: [], action: "wait",
+  reason_codes: [], email_sent: false, attempts: [], extracted: { interest_level: "low", follow_up_date: null, referred_contact: null, qualification: {} } };
+const liveDraft = { task: "draft", mode: "personalized", verdict: "accept", codes: [], usable_fact_ids: ["fct_edit_1"], attempts: [], claims: [{ fact_id: "fct_edit_1", text: "x" }], subject: "s", body: "Hi,\n\nI saw that x\n\nSTOP" };
+const seenBodies = [];
+await page.route("**/.netlify/functions/**", r => { const d = JSON.parse(r.request().postData() || "{}"); seenBodies.push(d);
+  r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(d.task === "reply" ? liveReply : d.task === "draft" ? liveDraft : { configured: true, model: "m" }) }); });
+await page.click('#scnPick .pill[data-id="F5"]'); await page.waitForSelector("#lvText");
+await page.click("#lvGo"); await page.waitForSelector("#lvOut .rhero");
+assert.equal(seenBodies.at(-1).task, "reply"); assert.match(seenBodies.at(-1).reply_text, /Let's see/);
+await page.click('#scnPick .pill[data-id="F10"]'); await page.waitForSelector("#lvGo");
+await page.click("#lvGo"); await page.waitForSelector("#lvOut .aipart");
+const sentDraft = seenBodies.at(-1); assert.equal(sentDraft.task, "draft"); assert.ok(sentDraft.company && sentDraft.facts.length > 1, "the live draft carries the company on screen and its facts");
+await page.reload(); await page.waitForSelector("#scnPick .pill");
+assert.match(await text("#scnCo"), /Facts known/, "the open scenario tab was lost after a reload");
+await page.unroute("**/.netlify/functions/**");
 
 // 4. Architecture keeps the open scenario list
 await go("flows"); await page.click("#moreCases > summary"); await page.click("tr.click");

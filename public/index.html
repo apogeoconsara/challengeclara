@@ -83,6 +83,36 @@ label.small { font-size: 12px; color: var(--muted); display: block; margin: 8px 
 .frules { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 10px; } .frules span { background: var(--panel-2); border-radius: 999px; padding: 2px 10px; font-size: 12.5px; }
 .aipart { background: var(--accent-dim); border: 1px solid #C9D6FB; border-radius: 10px; padding: 10px 12px; margin: 8px 0; } .aipart .cl { margin-top: 6px; font-size: 13px; }
 .dverdict { display: flex; align-items: center; gap: 10px; margin: 4px 0 6px; font-weight: 600; }
+.pills { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 12px; } .pill { border: 1px solid var(--line); background: var(--panel); border-radius: 999px; padding: 6px 12px; font: inherit; font-size: 13px; cursor: pointer; color: var(--text); } .pill:hover { border-color: var(--accent); } .pill.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.gl { font-size: 11.5px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 10px 0 4px; }
+.stage { display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: 14px; align-items: start; } @media (max-width: 860px) { .stage { grid-template-columns: 1fr; } }
+.co h3 { margin: 0 0 2px; } .kv { display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; font-size: 12.5px; margin: 8px 0; } .kv span:nth-child(odd) { color: var(--muted); }
+.meter { position: relative; height: 16px; border-radius: 8px; display: flex; margin: 22px 0 4px; } .meter i { display: block; height: 100%; } .meter i:first-of-type { border-radius: 8px 0 0 8px; } .meter i:last-of-type { border-radius: 0 8px 8px 0; }
+.mk { position: absolute; top: -17px; transform: translateX(-50%); font-size: 11px; font-weight: 700; } .mk::after { content: ""; display: block; width: 2px; height: 21px; background: var(--text); margin: 0 auto; }
+.tier { display: inline-flex; align-items: center; gap: 8px; font-family: var(--font-head); font-weight: 700; font-size: 18px; } .tier b { display: inline-flex; width: 30px; height: 30px; border-radius: 8px; align-items: center; justify-content: center; color: #fff; }
+.tA { background: #16A34A; } .tB { background: #2F5DF4; } .tC { background: #8B97B5; }
+.jr { position: relative; padding-left: 44px; } .jr::before { content: ""; position: absolute; left: 17px; top: 6px; bottom: 6px; width: 3px; background: var(--line); border-radius: 2px; }
+.jfill { position: absolute; left: 17px; top: 6px; width: 3px; background: linear-gradient(var(--accent), var(--teal)); border-radius: 2px; height: 0; transition: height .55s ease; }
+.st { position: relative; margin-bottom: 10px; opacity: 0; transform: translateY(6px); transition: opacity .35s, transform .35s; } .st.on { opacity: 1; transform: none; }
+.st .dot { position: absolute; left: -44px; top: 2px; width: 36px; height: 36px; border-radius: 50%; background: var(--panel); border: 2px solid var(--line); display: flex; align-items: center; justify-content: center; font-size: 16px; }
+.st.on .dot { border-color: var(--accent); } .st.ai .dot { background: var(--accent-dim); } .st.skip .dot { opacity: .55; } .st.flag .dot { border-color: #E0A33A; background: #FFFAF1; }
+.st .bx { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; } .st.skip .bx { background: var(--panel-2); border-style: dashed; } .st.ai .bx { border-color: #C9D6FB; background: #F5F8FF; } .st.flag .bx { border-color: #EDD5A8; background: #FFFAF1; }
+.st .t { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-weight: 700; font-size: 13px; } .st .h { font-size: 13px; margin-top: 2px; } .st .l { color: var(--muted); font-size: 12.5px; }
+.call { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 4px 0; font-size: 12.5px; border-top: 1px dashed var(--line); margin-top: 6px; } .call .k { font-family: var(--font-mono, monospace); font-size: 11.5px; background: var(--panel-2); padding: 1px 6px; border-radius: 5px; }
+.s200 { color: var(--good); font-weight: 700; } .s5 { color: #B45309; font-weight: 700; }
+.val { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 14px; align-items: start; } @media (max-width: 860px) { .val { grid-template-columns: 1fr; } }
+.aib { background: var(--accent-dim); border: 1px solid #C9D6FB; border-radius: 10px; padding: 10px 12px; } .nob { background: var(--panel-2); border-radius: 10px; padding: 10px 12px; }
+.live { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: var(--panel); } .live textarea { width: 100%; min-height: 62px; }
+table.lt { width: 100%; border-collapse: collapse; font-size: 13px; } table.lt th { text-align: left; color: var(--muted); font-size: 12px; padding: 8px 10px; border-bottom: 1px solid var(--line); } table.lt td { padding: 9px 10px; border-bottom: 1px solid var(--panel-2); } table.lt tr.row { cursor: pointer; } table.lt tr.row:hover, table.lt tr.row:focus-visible { background: var(--panel-2); }
+.tchip { display: inline-block; padding: 2px 9px; border-radius: 999px; font-weight: 700; font-size: 12px; } .tchipA { background: #E5F6EA; color: #11733A; } .tchipB { background: #E7ECFE; color: #2347C4; } .tchipC { background: #EEF1F7; color: #64708A; }
+.leadhead { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; } .bigrow { display: flex; align-items: baseline; gap: 8px; } .bigsc { font-family: var(--font-head); font-size: 44px; font-weight: 700; line-height: 1; }
+.rowp { display: flex; justify-content: space-between; gap: 10px; padding: 8px 0; border-top: 1px solid var(--panel-2); } .rowp .n { color: var(--muted); font-size: 12.5px; } .rowp b.pts { white-space: nowrap; }
+.cap { font-size: 11.5px; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); font-weight: 700; margin-bottom: 6px; } .nextact { font-family: var(--font-head); font-size: 16px; font-weight: 700; }
+.kv2 { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-size: 13px; } .kv2 span:nth-child(even) { text-align: right; font-weight: 600; }
+.back { background: none; border: 0; color: var(--accent); cursor: pointer; font: inherit; padding: 0; margin: 0 0 8px; }
+.fact { display: flex; gap: 8px; align-items: flex-start; padding: 6px 0; border-top: 1px solid var(--panel-2); font-size: 13px; } .fact .ok { white-space: nowrap; } .fact .no2 { white-space: nowrap; color: #B45309; font-weight: 600; }
+.stamp { display: inline-block; background: var(--accent-dim); color: #2347C4; border-radius: 6px; padding: 1px 7px; font-size: 11.5px; font-weight: 700; } .stamp.quiet { background: var(--panel-2); color: var(--muted); }
+@media (prefers-reduced-motion: reduce) { .st, .jfill { transition: none; } }
 .cmp td:first-child { color: var(--muted); width: 190px; }
 .ok { color: var(--good); font-weight: 600; } .no { color: var(--bad); font-weight: 600; }
 svg text { font-family: var(--font-body); }
@@ -446,39 +476,15 @@ const VIEWS = {
   },
 
   async run() {
-    const fl = await load("flows"), ov = await load("overview");
-    const g = fl.flows.find(f => f.id === "F2").contradiction;
+    const [fl, ld] = await Promise.all([load("flows"), load("leads")]);
     return `<h1>Live Demo</h1>
-      <p class="lede">One event goes in and you can watch every step: what changed, which rule decided, what Claude understood, whether the safety check accepted it, and what was recorded. Takes about a minute.</p>
-      <div class="banner">${esc(fl.label)} When a flow drafts an email, the engine holds it as pending approval; a scripted reviewer (standing in for a person) approves it, and only then is it recorded in a simulated log. Nothing is ever sent.</div>
-      <div class="card hero" id="truth">
-        <div class="eyebrow">The moment of truth</div>
-        <h2 style="margin:4px 0 10px">What happens when the model and the rules disagree?</h2>
-        <div class="quote">“${esc(g.text)}”</div>
-        <div class="trio" id="trio">
-          <div class="tbox" id="t1"><div class="tl1">Claude says</div><div class="tv">&nbsp;</div><div class="d">&nbsp;</div></div>
-          <div class="tarrow">→</div>
-          <div class="tbox" id="t2"><div class="tl1">Rule guard</div><div class="tv">&nbsp;</div><div class="d">&nbsp;</div></div>
-          <div class="tarrow">→</div>
-          <div class="tbox" id="t3"><div class="tl1">Final action</div><div class="tv">&nbsp;</div><div class="d">&nbsp;</div></div>
-        </div>
-        <p style="margin:14px 0 0"><button class="btn" id="truthRun">Replay a model mistake</button>
-          <button class="btn ghost" id="truthLive">Ask the live Claude the same sentence</button> <span class="d" id="truthNote"></span></p>
-        <div class="d" style="margin-top:8px"><b>Replay:</b> simulated. A strong model usually reads this sentence correctly, so we hand the engine an "interested" answer to show what the rules do when a model gets it wrong.
-          <b>Live:</b> the real model, the real validator, the real rules. Whatever it answers, the final action is decided by the rules.</div>
-        <div id="truthLiveOut"></div>
-      </div>
-      <h2>Run a full flow</h2>
-      <div class="d" style="margin-bottom:4px">How one event is handled</div>
-      <div class="chips" id="flowChips">${fl.flows.filter(f => f.group === "core").map(f => `<button data-run="${f.id}" class="${f.id === (state.runFlow || "F0") ? "active" : ""}">${esc(f.title)}</button>`).join("")}</div>
-      <div class="d" style="margin-bottom:4px">When the CRM misbehaves</div>
-      <div class="chips" id="crmChips">${fl.flows.filter(f => f.group === "crm").map(f => `<button data-run="${f.id}" class="${f.id === (state.runFlow || "F0") ? "active" : ""}">${esc(f.title)}</button>`).join("")}</div>
-      <div class="card" id="runCard"></div>
-      <h2>Three systems, one conductor</h2>
-      <p class="lede" style="margin-bottom:10px">The system sits between the AI, the CRM and outreach. It is the only one that decides, and each system gets its own safety rule. The order is always the same: read the state, rules decide, AI proposes, the validator checks, the CRM write is recorded, the outreach is prepared, a person approves, and the send is re-checked.</p>
-      <div class="card tablewrap"><table><thead><tr><th>system</th><th>what the system reads</th><th>what it writes</th><th>how it stays safe</th></tr></thead><tbody>
-        ${fl.coordination.map(c => `<tr><td><b>${esc(c.system)}</b></td><td>${esc(c.reads)}</td><td>${esc(c.writes)}</td><td>${esc(c.guard)}</td></tr>`).join("")}</tbody></table>
-        <p class="d" style="margin:8px 0 0">Enrichment and the calendar follow the same pattern: every call has an idempotency key, retries use the same key, and an uncertain result is read back before anything is repeated. The CRM here is a simulated system with every failure mode its contract describes.</p></div>`;
+      <p class="lede">See how the engine works at a glance: which companies it scores and why, what it decides for each, where the AI helps, and what happens when events repeat or systems fail. Every company here is synthetic.</p>
+      <div class="seg" id="runTabs"><button data-rt="leads">Leads</button><button data-rt="scn">Scenarios</button></div>
+      <div id="runLeads"><div class="banner">${esc(ld.label)}</div><div id="leadList"></div><div id="leadPage"></div></div>
+      <div id="runScn" class="hidden"><div class="banner">${esc(fl.label)} When a flow drafts an email, the engine holds it as pending approval; a scripted reviewer (standing in for a person) approves it, and only then is it recorded in a simulated log. Nothing is ever sent. The companies are synthetic, lent from the sample world.</div>
+        <div id="scnPick"></div><p class="d" id="scnStory" style="margin:0 0 12px"></p>
+        <div class="stage"><div class="card co" id="scnCo"></div><div class="jr" id="scnJr"></div></div>
+        <div class="val" id="scnVal"></div></div>`;
   },
 
   async ops() {
@@ -1129,81 +1135,167 @@ function plainKey(k) {
 }
 
 // ---- Live Demo ------------------------------------------------------------------------------------------------------
-const RUN = { timers: [], flow: null, step: -1, running: false };
-const RDONE = store.get("orch.runDone") || {};                         // flows already run to the end (kept across tabs and reloads)
-const TRUTH = store.get("orch.truth") || { replayed: false, live: null };
-const STAGE_ICON = { event: "1", state: "2", rules: "3", model: "4", validator: "5", action: "6", audit: "7" };
-const curFlow = () => DATA.flows.flows.find(x => x.id === (state.runFlow || "F0"));
-const runStep = f => RUN.flow === f.id ? RUN.step : (RDONE[f.id] ? f.stages.length - 1 : -1);
-const isRunning = f => RUN.running && RUN.flow === f.id;
-function stopRun() { RUN.timers.forEach(clearTimeout); RUN.timers = []; RUN.running = false; }
-function markDone(f) { RDONE[f.id] = true; store.set("orch.runDone", RDONE); }
-function renderRun() {
-  const card = $("#runCard"); if (!card) return;                       // another tab is open: the run goes on in the background
-  const f = curFlow(), step = runStep(f), running = isRunning(f);
-  const pipe = f.stages.map((s, i) => {
-    const cls = i > step ? "pending" : i === step && running ? "active" : s.status;
-    return `<div class="pstep ${cls}"><div class="pn">${STAGE_ICON[s.id]}</div><div class="pname">${esc(s.name)}</div></div>`;
-  }).join('<div class="pline"></div>');
-  const revealed = f.stages.slice(0, step + 1).map(s => `<div class="rstep ${s.status}"><div class="rk">${esc(s.name)}${s.status === "skipped" ? ' <span class="d">· skipped</span>' : ""}</div>
-    <div class="rh">${esc(s.headline)}</div>${s.lines.length ? `<ul>${s.lines.slice(0, s.id === "audit" ? 12 : 8).map(l => `<li>${esc(l)}</li>`).join("")}</ul>` : ""}</div>`).join("");
-  const done = step >= f.stages.length - 1 && !running;
-  const calls = done && f.calls.length ? `<details open><summary>Calls to the simulated systems (${f.calls.length})</summary><div class="tablewrap"><table><tbody>${f.calls.map(c => `<tr><td><b>${esc(c.system.toUpperCase())}</b> ${esc(c.op.replace("_email", ""))}</td><td class="mono d">${esc(c.key)}</td><td>${c.status === 200 && c.text === "ok" ? '<span class="ok">200 ok</span>' : `<span style="color:var(--warn);font-weight:600">${c.status} ${esc(c.text)}</span>`}</td></tr>`).join("")}</tbody></table></div><div class="d">Same key on every retry, so the system ends with ${Object.values(f.ledger).flat().length} record${Object.values(f.ledger).flat().length === 1 ? "" : "s"} in its simulated logs, never more.</div></details>` : "";
-  const audit = done ? `<details open><summary>Audit trail (${f.audit.length} entries)</summary><div class="tablewrap"><table><tbody>${f.audit.map(a => `<tr><td class="mono d">${esc(a.ts || "")}</td><td><b>${esc(a.kind.replaceAll("_", " "))}</b></td><td class="d">${esc(a.detail)}</td></tr>`).join("")}</tbody></table></div></details>` : "";
-  card.innerHTML = `<div class="d" style="margin-bottom:8px">${esc(f.story)}</div>
-    <p style="margin:0 0 12px"><button class="btn" id="runGo" ${running ? "disabled" : ""}>${step >= 0 && !running ? "Run again" : "Run flow"}</button>
-      <button class="btn ghost" id="runSkip" ${running ? "" : "disabled"}>Skip the animation</button> <span class="d">${esc(f.label)}</span></p>
-    <div class="pipe">${pipe}</div><div class="rsteps">${revealed}</div>
-    ${done ? `<div class="banner final" style="margin-top:12px">Result: <b>${esc(f.final.text)}</b>${f.final.codes.length ? " · " + f.final.codes.map(c => esc(DATA.overview.plain.codes[c] || c)).join(" · ") : ""}</div>` : ""}${calls}${audit}`;
-  $("#runGo").onclick = () => startRun();
-  $("#runSkip").onclick = () => { stopRun(); RUN.flow = f.id; RUN.step = f.stages.length - 1; markDone(f); renderRun(); };
+// Two views of the same engine: the Leads (twelve companies, each run as a new target) and the Scenarios (what happens when events
+// repeat or systems fail). Every number comes from the engine's own runs; the two Claude buttons call the real model.
+const RUN = { timers: [] };
+const RDONE = store.get("orch.runDone") || {};                         // scenarios whose animation already ran (shown at once next time)
+const SCN_LIVE = store.get("orch.scnLive") || {};                      // the last live answer per lead or scenario
+const SCN_GROUPS = [["A normal day", ["F10", "F0", "F9", "F1"]], ["The AI has to be careful", ["F2", "F5"]], ["The same event twice", ["F3"]], ["When a system fails", ["F4", "F6", "F7", "F8"]]];
+const SCN_SHORT = { F0: "New target · Standard", F1: "Prospect is interested", F2: "“Interested, but stop”", F3: "Same webhook twice", F4: "Email API fails", F5: "Vague reply", F6: "CRM fails (503)", F7: "CRM says “unknown”", F8: "CRM changed (409)", F9: "Weaker fit → nurture", F10: "New target · Top priority" };
+const SCN_AI = {
+  F0: [1, "The rules said yes. The company had a verified, recent fact, so Claude wrote one opening line from it and the validator checked that it cites that fact. The rest of the email is a fixed template."],
+  F1: [1, "Without AI a person would read every reply. Claude read free text and pulled out size, tools and timeline. Then the rules chose the next step: it proposed, they decided."],
+  F2: [1, "Claude got it wrong on purpose (simulated): it read interest. The rules saw the opt-out phrase and won. This is why the AI only proposes. The live button asks the real model the same sentence."],
+  F3: [0, "No AI. Spotting a repeated delivery is a plain id check, so the second copy is ignored before it can cost a model call."],
+  F4: [0, "No AI here: this company has no usable fact, so the generic template goes out and the model is not called. What keeps the failure safe is the idempotency key: the retry reuses it, so the email is recorded once."],
+  F5: [1, "Claude saw the reply says nothing to act on and labelled it ambiguous. A person decides instead of the system guessing."],
+  F6: [0, "No AI. The retry reuses the same key, so exactly one task lands in the CRM."],
+  F7: [0, "No AI. When the answer is unknown, the system reads back by key before writing again."],
+  F8: [1, "The conflict triggers a fresh read and a new decision before anything is written; Claude then wrote the opening line from a verified fact. The AI helps with the email; the rules and the CRM keep it safe."],
+  F9: [0, "No AI by design. Even with a usable fact, a weaker-fit company gets no email and no model call: the score decides and only the enrolment is recorded. The AI is spent where it can matter."],
+  F10: [1, "Verified facts exist, so Claude wrote the opening line from one of them. The validator checked that every claim cites a real fact, and the draft waits for a person."],
+};
+const TIER_LABEL = { A: "Top priority", B: "Standard", C: "Nurture" };
+const SYS_NAME = { crm: ["🗄️", "CRM (HubSpot-style)"], send: ["✉️", "Email log"], enrich: ["🔎", "Enrichment"], calendar: ["📅", "Calendar"] };
+const sizeNote = a => a.size === "ideal" ? `${a.employees} employees: full points from 51 up` : a.size === "edge" ? `${a.employees} employees: half points for 11 to 50` : `${a.employees ?? "unknown"} employees: no points`;
+const factRows = (facts, empty = "No facts about this company.") => facts.map(x => `<div class="fact"><span class="${x.why_not ? "no2" : "ok"}">${x.why_not ? "✗" : "✓"}</span><span>${esc(x.text)}<div class="d">${x.why_not ? "Blocked: " + esc(x.why_not) : "Usable: verified, under a year old, about this company"} · ${esc(x.source)}, ${esc(x.seen)}</div></span></div>`).join("") || `<div class="d">${empty}</div>`;
+function stopRun() { RUN.timers.forEach(clearTimeout); RUN.timers = []; }
+
+// The live panel. kind "reply": Claude reads a reply. kind "draft": Claude writes the opening line from the company's facts.
+function livePanel(key, ctx) {
+  const saved = SCN_LIVE[key] ? SCN_LIVE[key] : "";
+  const head = ctx.kind === "reply"
+    ? `<div class="cap">Ask Claude about this reply · live</div><textarea id="lvText" maxlength="2000" aria-label="Reply text">${esc(ctx.text)}</textarea>
+       <p style="margin:8px 0 0"><button class="btn" id="lvGo">Ask Claude</button> <span class="d">Real model, real validator, real rules. Returns the type of reply, what it picked up and the final action.</span></p>`
+    : `<div class="cap">Ask Claude to write the opening line · live</div><div class="d" style="margin-bottom:6px">It is given the facts below. The rules still decide which one it may use, and the validator checks what it writes.${ctx.recorded ? "" : " In the recorded run this company did not reach the model."}</div>
+       <p style="margin:8px 0 0"><button class="btn" id="lvGo">Ask Claude to write it</button> <span class="d">Real model. Display only: nothing is sent.</span></p>`;
+  return `<div class="live">${head}<div id="lvOut">${saved}</div></div>`;
 }
-function startRun() {
-  stopRun(); const f = curFlow();
-  RUN.flow = f.id; RUN.step = -1; RUN.running = true; renderRun();
-  f.stages.forEach((s, i) => RUN.timers.push(setTimeout(() => {
-    RUN.step = i; RUN.running = i < f.stages.length - 1;
-    if (!RUN.running) markDone(f);
-    renderRun();
-    const last = document.querySelector(".rstep:last-child"); if (last && i > 1) last.scrollIntoView({ block: "nearest", behavior: "smooth" });
-  }, 900 + i * 1400)));
+function bindLivePanel(key, ctx) {
+  const go = $("#lvGo"); if (!go) return;
+  go.onclick = async () => {
+    const out = $("#lvOut"); go.disabled = true; out.innerHTML = '<p class="d">Asking Claude…</p>';
+    try {
+      let html;
+      if (ctx.kind === "reply") html = renderReply(await fn({ task: "reply", reply_text: $("#lvText").value, crm_state: "prospect", company: ctx.company }));
+      else {
+        const sent = ctx.facts.map(f => ({ text: f.text, is_verified: f.why_not !== "not verified", observed_at: `${f.seen}T16:00:00Z` }));
+        html = renderDraft(await fn({ task: "draft", case_id: "EV-G080", facts: sent, company: ctx.company, contact_first_name: ctx.first, employees: ctx.employees }), sent);
+      }
+      SCN_LIVE[key] = html; store.set("orch.scnLive", SCN_LIVE); out.innerHTML = html;
+    } catch (e) { out.innerHTML = `<p class="no">${esc(e.message)}${/not configured/.test(e.message) ? " The live model is not configured on this deployment, so only the recorded runs are available." : ""}</p>`; }
+    go.disabled = false;
+  };
 }
-function showTrio(n, boxes) {
-  boxes.slice(0, n).forEach((b, i) => { const el = $("#t" + (i + 1)); if (!el) return; el.className = "tbox on " + b.tone; el.querySelector(".tv").textContent = b.v; el.querySelector(".d").textContent = b.d; });
+
+// ---- Leads
+function leadList() {
+  const ld = DATA.leads;
+  $("#leadList").innerHTML = `<div class="card tablewrap" style="padding:0"><table class="lt"><thead><tr><th>Company</th><th>Industry</th><th>Employees</th><th>Country</th><th>Signals</th><th>Score</th><th>Tier</th><th>What the engine did</th></tr></thead><tbody>${ld.leads.map((l, i) => { const a = l.account;
+    return `<tr class="row" data-i="${i}" tabindex="0"><td><b>${esc(a.name)}</b></td><td>${esc(a.industry)}</td><td>${a.employees}</td><td>${esc(a.country)}</td><td>${a.signals.length}</td><td><b>${a.score}</b></td><td><span class="tchip tchip${a.tier}">${TIER_LABEL[a.tier]}</span></td><td>${esc(l.decision.text)}</td></tr>`; }).join("")}</tbody></table></div>
+    <p class="d">Click a company to open its page. Four per group: three follow the normal path and one shows another outcome the rules can reach.</p>`;
+  document.querySelectorAll("#leadList tr.row").forEach(r => { r.onclick = () => openLead(+r.dataset.i); r.onkeydown = e => { if (e.key === "Enter") openLead(+r.dataset.i); }; });
 }
-function truthBoxes(g) {
-  const act = DATA.overview.plain.actions[g.final_action];
-  return [{ v: `“${g.claude_label}” (${Math.round(g.claude_confidence * 100)}%)`, d: "Reads the interest and misses the opt-out", tone: "claude" },
-    { v: g.guard ? "Opt-out detected" : "No opt-out", d: "“don't email me again” matches an opt-out rule. Opt-out always wins.", tone: "guard" },
-    { v: String(g.final_action).toUpperCase(), d: `${act[0]}. Contact suppressed, pending emails cancelled, a person is told about the interest.`, tone: "final" }];
+function openLead(i) { state.lead = i; leadPage(); saveUI(); window.scrollTo(0, 0); }
+function leadPage() {
+  const ld = DATA.leads, i = state.lead;
+  if (i == null || !ld.leads[i]) { $("#leadPage").innerHTML = ""; $("#leadList").classList.remove("hidden"); return; }
+  const l = ld.leads[i], a = l.account, d = l.decision, dr = l.draft, sigMax = a.signal_each * a.signal_cap, ai = Boolean(dr && dr.ai);
+  const why = `${a.name} (${a.employees} employees, ${a.country}) ${a.size === "ideal" ? "fits the profile by size" : "is below the ideal size"}${a.signals.length ? ` and shows ${a.signals.length} public growth signal${a.signals.length > 1 ? "s" : ""}. First: ${a.signals[0]}` : " and shows no public growth signals yet."}`;
+  const next = { contact: "Prepare a personal outreach email and hold it until a person approves it.", nurture: "Keep it in the slow track. No email and no AI call; it is scored again at the next event.", wait: "Wait. The system checks again by itself when the pause ends.", enrich: "Enrich the data first, then decide again.", suppress: "Do not contact.", handoff_ae: "Pass to a sales exec." }[d.action] || d.what;
+  const angle = dr ? `<div class="d" style="margin-bottom:6px">${ai ? '<span class="stamp">✨ AI wrote the opening line</span> from a verified fact' : `<span class="stamp quiet">Fixed template</span> ${dr.step > 1 ? "Follow-up emails (step 2 and 4) use fixed text" : "No usable fact, so no AI line"}`}</div>
+      <div class="email"><div class="hdr">Prepared automatically · waits for a person's approval · nothing is sent</div><div><b>${esc(dr.subject)}</b></div><div class="body">${esc(dr.body)}</div></div>`
+    : `<div class="d">${d.action === "nurture" ? "No email is drafted for a weaker-fit company, and the model is not called." : "No email was drafted: the rules stopped before that step."}</div>`;
+  $("#leadList").classList.add("hidden");
+  $("#leadPage").innerHTML = `<button class="back" id="leadBack">← All leads</button>
+    <div class="leadhead"><h2 style="margin:0">${esc(a.name)}</h2><span class="tchip tchip${a.tier}">${TIER_LABEL[a.tier]}</span><span class="d">${esc(a.industry)} · ${esc(a.country)} · ${a.employees} employees · contact: ${esc(l.contact.name)}, ${esc(l.contact.title)}</span><span class="tag">synthetic</span></div>
+    <div class="grid g3">
+      <div class="card"><div class="cap">Score (ICP)</div><div class="bigrow"><span class="bigsc">${a.score}</span><span class="d">/ ${a.max}</span><span class="tchip tchip${a.tier}">${TIER_LABEL[a.tier]}</span></div>
+        <div class="rowp"><div><div>Company size</div><div class="n">${esc(sizeNote(a))}</div></div><b class="pts">+${a.parts.size} / ${a.max - 25 - sigMax}</b></div>
+        <div class="rowp"><div><div>Likely payment pain (hypothesis)</div><div class="n">${a.pain ? "An inference, not confirmed by the company" : "No pain hypothesis"}</div></div><b class="pts">+${a.parts.pain} / 25</b></div>
+        <div class="rowp"><div><div>Growth signals</div><div class="n">${a.signals.length} public signal${a.signals.length === 1 ? "" : "s"}, ${a.signal_each} pts each (up to ${a.signal_cap})</div></div><b class="pts">+${a.parts.signals} / ${sigMax}</b></div>
+        <div class="d" style="margin-top:8px">Country and industry do not score. Standard starts at ${a.tier_b}, Top priority at ${a.tier_a}. Scoring version ${esc(a.version)}.</div></div>
+      <div class="card"><div class="cap">Routing decision</div><div style="margin-bottom:8px"><span class="tchip tchip${a.tier}">${esc(d.text)}</span> ${d.action === "contact" ? '<span class="d">needs human approval</span>' : ""}</div>
+        <div style="margin-bottom:8px">${esc(d.what)}</div>${d.codes.map(c => `<div class="d">• ${esc(c)}</div>`).join("")}
+        <div class="d" style="margin-top:8px">${a.tier === "C" ? `Score below ${a.tier_b}: the slow track, no email and no AI cost.` : `Score at or above ${a.tier_b}: eligible for a personal email.`}</div></div>
+      <div class="card"><div class="cap">CRM state · simulated, HubSpot was not called</div><div class="kv2"><span>Record</span><span>Simulated</span><span>Lifecycle stage</span><span>${esc(a.crm.status)}</span><span>Owner</span><span>${a.crm.owner_ae ? esc(a.crm.owner_ae) : "unassigned"}</span><span>Contacts</span><span>${a.crm.contacts}</span><span>Open deals</span><span>${a.crm.open_deals}</span><span>Emails so far</span><span>${a.crm.emails_so_far}</span><span>Opted out</span><span>${a.crm.suppressed ? "yes" : "no"}</span></div>
+        <div class="d" style="margin-top:8px">The engine writes a decision note or a sales-exec task here, with an idempotency key. The CRM is a mock with the same contract as a real one.</div></div>
+      <div class="card"><div class="cap">Why this account matters · template text</div><div>${esc(why)}</div></div>
+      <div class="card"><div class="cap">Recommended next action</div><div class="nextact">${esc(next)}</div></div>
+      <div class="card"><div class="cap">Personalized outreach angle</div>${angle}</div></div>
+    <div class="grid g2" style="margin-top:12px">
+      <div class="card"><div class="cap">Facts known · what the rules allow</div>${factRows(a.facts)}</div>
+      <div><div class="${ai ? "aib" : "nob"}"><div class="cap">Where the AI added value</div><div style="margin:4px 0"><b>${ai ? "✨ Claude helped here" : "Rules only: no AI used"}</b></div>
+        <div class="d" style="color:var(--text)">${ai ? "The facts are filtered by rules first. Claude only wrote one opening line from a usable fact, and the validator checked that it cites it. Without it the email is a generic template." : d.action === "nurture" ? "No AI by design: a weaker-fit company costs no model call. The AI is spent where it can matter." : "No AI step was needed for this decision."}</div></div>
+        <div style="margin-top:12px">${livePanel("lead:" + l.id, { kind: "draft", facts: a.facts, company: a.name, first: l.contact.name.split(" ")[0], employees: a.employees, recorded: ai })}</div></div></div>`;
+  bindLivePanel("lead:" + l.id, { kind: "draft", facts: a.facts, company: a.name, first: l.contact.name.split(" ")[0], employees: a.employees });
+  $("#leadBack").onclick = () => { state.lead = null; leadPage(); saveUI(); };
+}
+
+// ---- Scenarios
+function scnSteps(f) {
+  const by = Object.fromEntries(f.stages.map(s => [s.id, s])), a = f.account, isReply = /replies/i.test(by.event.headline), dup = by.state.status === "skipped";
+  const callHtml = sys => f.calls.filter(c => c.system === sys).map(c => `<div class="call"><span>${SYS_NAME[c.system] ? SYS_NAME[c.system][0] : "🔌"} <b>${esc(SYS_NAME[c.system] ? SYS_NAME[c.system][1] : c.system)} (simulated)</b></span><span>${esc(c.op)}</span><span class="k" title="${esc(c.key)}">key …${esc(c.key.slice(-14))}</span><span class="${c.status >= 400 ? "s5" : "s200"}">${c.status} ${esc(c.text)}</span></div>`).join("");
+  const keys = {}; f.calls.forEach(c => { keys[c.key] = (keys[c.key] || 0) + 1; });
+  const reuse = Object.values(keys).some(n => n > 1), pend = by.action.lines.some(l => /pending approval/.test(l)), out = [];
+  out.push({ ic: "📥", who: "Webhook", h: by.event.headline, l: by.event.lines });
+  out.push({ ic: "🗂️", who: "State", cls: dup ? "skip" : "", h: by.state.headline, l: by.state.lines, tags: dup ? [tag("duplicate", "warn")] : [] });
+  out.push({ ic: "⚖️", who: "Rules", cls: by.rules.status === "skipped" ? "skip" : "", h: by.rules.headline, l: by.rules.lines.slice(0, 2), tags: [tag("deterministic")] });
+  out.push(dup || isReply ? { ic: "🏷️", who: "Score", cls: "skip", h: dup ? "Not needed for a duplicate" : "Not needed: a reply follows the reply rules, not the score", l: [`The company still scores ${a.score}/${a.max} (${TIER_LABEL[a.tier]}).`] }
+    : { ic: "🏷️", who: "Score", h: `${a.score} points → ${TIER_LABEL[a.tier]}: ${a.tier === "C" ? "Nurture: no email, no AI" : "Personal outreach email"}`, l: [`size ${a.parts.size} + payment pain ${a.parts.pain} + signals ${a.parts.signals}. Scoring version ${a.version}.`], tags: [tag(TIER_LABEL[a.tier], a.tier === "A" ? "good" : a.tier === "B" ? "acc" : "")] });
+  const ms = by.model.status;
+  out.push({ ic: "✨", who: "Claude", cls: ms === "skipped" ? "skip" : "ai", h: by.model.headline, l: by.model.lines, tags: [ms === "skipped" ? tag("not needed") : tag("✨ AI", "acc"), ...(ms !== "skipped" ? [tag("proposes only")] : [])] });
+  const vs = by.validator.status;
+  out.push({ ic: "🛡️", who: "Safety check", cls: vs === "skipped" ? "skip" : vs === "flag" ? "flag" : "", h: by.validator.headline, l: by.validator.lines, tags: vs === "flag" ? [tag("rules stepped in", "warn")] : [] });
+  out.push({ ic: "🎯", who: "Action", h: by.action.headline, l: by.action.lines.filter(x => !/pending approval|Approved by|Email recorded/.test(x)), extra: callHtml("crm") });
+  if (pend) {
+    out.push({ ic: "🙋", who: "Person", h: "Held until a person approves it", l: ["In this recorded run a scripted reviewer stands in for the person."] });
+    const sc = f.calls.filter(c => c.system === "send");
+    out.push({ ic: "✉️", who: "Email log", h: sc.length > 1 ? `Recorded after ${sc.length} attempts, once` : "Recorded in the simulated log", l: ["Nothing is ever sent."], extra: callHtml("send") });
+  }
+  out.push({ ic: "📒", who: "Audit log", h: by.audit.headline, l: [], extra: `<div style="margin-top:4px">${f.audit.map(x => tag(esc(x.kind.replaceAll("_", " ")))).join("")}</div>` });
+  return { out, reuse };
+}
+function scnDraw() {
+  stopRun();
+  const fl = DATA.flows, id = fl.flows.some(x => x.id === state.runFlow) ? state.runFlow : "F10", f = fl.flows.find(x => x.id === id), a = f.account, sim = /SIMULATED/.test(f.label);
+  document.querySelectorAll("#scnPick .pill").forEach(b => b.classList.toggle("active", b.dataset.id === id));
+  $("#scnStory").innerHTML = `${esc(f.story)} ${sim ? tag("simulated model mistake", "warn") : tag("recorded run of the real engine", "good")}`;
+  const mk = 100 * a.score / a.max, pct = v => 100 * v / a.max, usable = a.facts.filter(x => !x.why_not).length;
+  $("#scnCo").innerHTML = `<div class="d">The company</div><h3>${esc(a.name)}</h3><div class="d">${esc(a.country)} · ${esc(a.industry)} · ${a.employees} employees · synthetic</div>
+    <div class="d" style="margin-top:10px"><b>CRM record (mock)</b></div><div class="kv"><span>Status</span><span>${esc(a.crm.status.replaceAll("_", " "))}</span><span>Owner</span><span>${a.crm.owner_ae ? esc(a.crm.owner_ae) : "none yet"}</span><span>Contacts</span><span>${a.crm.contacts}</span><span>Open deals</span><span>${a.crm.open_deals}</span><span>Emails so far</span><span>${a.crm.emails_so_far}</span><span>Opted out</span><span>${a.crm.suppressed ? "yes" : "no"}</span></div>
+    <div class="d"><b>Score</b> · picks the track</div>
+    <div class="meter"><div class="mk" style="left:${mk}%">${a.score}</div><i style="width:${pct(a.tier_b)}%;background:#CBD2E1"></i><i style="width:${pct(a.tier_a - a.tier_b)}%;background:#9DB5F8"></i><i style="flex:1;background:#7FD3A0"></i></div>
+    <div class="d" style="display:flex;justify-content:space-between"><span>Nurture 0–${a.tier_b - 1}</span><span>Standard ${a.tier_b}–${a.tier_a - 1}</span><span>Top ${a.tier_a}+</span></div>
+    <div class="tier" style="margin-top:10px"><b class="t${a.tier}">${a.tier}</b>${TIER_LABEL[a.tier]}</div>
+    <div class="d" style="margin-top:6px">size ${a.parts.size} + pain ${a.parts.pain} + signals ${a.parts.signals} = ${a.score}</div>
+    <div class="d" style="margin-top:12px"><b>Facts known</b> · ${usable} of ${a.facts.length} usable in an email</div>${factRows(a.facts, "No facts known.")}`;
+  const { out, reuse } = scnSteps(f);
+  $("#scnJr").innerHTML = '<div class="jfill" id="scnFill"></div>' + out.map(s => `<div class="st ${s.cls || ""}"><div class="dot">${s.ic}</div><div class="bx"><div class="t">${s.who}${(s.tags || []).join("")}</div><div class="h">${esc(s.h)}</div>${(s.l || []).map(x => `<div class="l">${esc(x)}</div>`).join("")}${s.extra || ""}</div></div>`).join("")
+    + (reuse ? '<div class="d" style="margin:-2px 0 0">The same idempotency key was used on both attempts, so the effect happened once.</div>' : "");
+  const ai = SCN_AI[id], isReply = /replies/i.test(f.stages[0].headline), quote = (f.stages[0].lines[1] || "").replace(/^"|"$/g, "");
+  const ctx = isReply ? { kind: "reply", text: quote, company: a.name } : { kind: "draft", facts: a.facts, company: a.name, first: a.contact ? a.contact.first : "there", employees: a.employees, recorded: f.stages.find(s => s.id === "model").status !== "skipped" };
+  $("#scnVal").innerHTML = `<div class="${ai[0] ? "aib" : "nob"}"><div class="cap">Where the AI added value</div><div style="margin:4px 0"><b>${ai[0] ? "✨ Claude helped here" : "Rules only: no AI used"}</b></div><div class="d" style="color:var(--text)">${esc(ai[1])}</div></div>${livePanel("scn:" + id, ctx)}`;
+  bindLivePanel("scn:" + id, ctx);
+  const els = [...document.querySelectorAll("#scnJr .st")], fill = el => { const b = $("#scnFill"); if (b) b.style.height = (el.offsetTop + 20) + "px"; };
+  const instant = RDONE[id] || matchMedia("(prefers-reduced-motion: reduce)").matches;
+  els.forEach((el, i) => {
+    const go = () => { el.classList.add("on"); fill(el); if (i === els.length - 1) { RDONE[id] = true; store.set("orch.runDone", RDONE); } };
+    if (instant) go(); else RUN.timers.push(setTimeout(go, 250 + i * 480));
+  });
+}
+function runTab() {
+  const t = state.runTab === "scn" ? "scn" : "leads";
+  document.querySelectorAll("#runTabs button").forEach(b => b.classList.toggle("active", b.dataset.rt === t));
+  $("#runLeads").classList.toggle("hidden", t !== "leads"); $("#runScn").classList.toggle("hidden", t !== "scn");
+  stopRun(); if (t === "scn") scnDraw();
 }
 function bindRun() {
-  const fl = DATA.flows, g = fl.flows.find(f => f.id === "F2").contradiction;
-  renderRun();
-  if (TRUTH.replayed) { showTrio(3, truthBoxes(g)); $("#truthNote").textContent = "Replay of a simulated model mistake"; }
-  if (TRUTH.live) $("#truthLiveOut").innerHTML = TRUTH.live;
-  const pick = e => { const b = e.target.closest("[data-run]"); if (!b) return; stopRun(); state.runFlow = b.dataset.run;
-    document.querySelectorAll("#flowChips button, #crmChips button").forEach(x => x.classList.toggle("active", x === b)); renderRun(); };
-  $("#flowChips").onclick = pick; $("#crmChips").onclick = pick;
-  const clear = () => document.querySelectorAll("#trio .tbox").forEach(b => { b.className = "tbox"; b.querySelector(".tv").innerHTML = "&nbsp;"; b.querySelector(".d").innerHTML = "&nbsp;"; });
-  $("#truthRun").onclick = () => {
-    clear(); $("#truthNote").textContent = "Replay of a simulated model mistake";
-    [1, 2, 3].forEach((n, i) => setTimeout(() => { showTrio(n, truthBoxes(g)); if (n === 3) { TRUTH.replayed = true; store.set("orch.truth", TRUTH); } }, 300 + i * 1300));
-  };
-  $("#truthLive").onclick = async () => {
-    const out = $("#truthLiveOut"), btn = $("#truthLive"); btn.disabled = true; out.innerHTML = '<p class="d">Asking Claude…</p>';
-    try {
-      const j = await fn({ task: "reply", reply_text: fl.guard_text, crm_state: "prospect", company: "Dorada Demo" });
-      const optOut = ["unsubscribe", "hostile", "mixed_signals"].includes(j.label), guard = (j.violation_codes || []).includes("G001");
-      out.innerHTML = `<div class="trio live" style="margin-top:14px">
-        <div class="tbox on claude"><div class="tl1">Claude says (live)</div><div class="tv">“${esc(j.label ?? "no answer")}”${j.confidence != null ? ` (${Math.round(j.confidence * 100)}%)` : ""}</div><div class="d">${esc(j.model || "")}</div></div><div class="tarrow">→</div>
-        <div class="tbox on guard"><div class="tl1">Rule guard</div><div class="tv">${guard ? "Opt-out detected" : optOut ? "Agrees: opt-out understood" : "No override needed"}</div><div class="d">${guard ? "The model missed the opt-out; the rules caught it." : "The model got it right, so the guard had nothing to correct."}</div></div><div class="tarrow">→</div>
-        <div class="tbox on final"><div class="tl1">Final action</div><div class="tv">${esc(String(j.action).toUpperCase())}</div><div class="d">${esc((j.reason_codes || []).join(", "))} · validator: ${esc(j.verdict)}</div></div></div>
-        <p class="d" style="margin-top:8px">Real model output, real validator, real rules. Nothing was sent: this function has no email code.</p>`;
-      TRUTH.live = out.innerHTML; store.set("orch.truth", TRUTH);
-    } catch (e) { out.innerHTML = `<p class="no">${esc(e.message)}${/not configured/.test(e.message) ? " The live model is not configured on this deployment, so only the replay is available." : ""}</p>`; }
-    btn.disabled = false;
-  };
+  const fl = DATA.flows;
+  $("#scnPick").innerHTML = SCN_GROUPS.map(([g, ids]) => `<div class="gl">${g}</div><div class="pills">${ids.map(id => `<button class="pill" data-id="${id}">${esc(SCN_SHORT[id])}</button>`).join("")}</div>`).join("");
+  $("#scnPick").onclick = e => { const b = e.target.closest(".pill"); if (b) { state.runFlow = b.dataset.id; saveUI(); scnDraw(); } };
+  $("#runTabs").onclick = e => { const b = e.target.closest("[data-rt]"); if (b) { state.runTab = b.dataset.rt; saveUI(); runTab(); } };
+  leadList(); leadPage(); runTab();
 }
 
 // ---- Approval Queue ----------------------------------------------------------------------------------------------------
@@ -1612,11 +1704,12 @@ Object.keys(GROUPS).forEach(g => { VIEWS[g] = () => groupView(g); });
 
 // ---------------------------------------------------------------------------------------------------------------
 const state = { view: "overview", ...(store.get("orch.ui") || {}) };
+function saveUI() { store.set("orch.ui", { flow: state.flow, runFlow: state.runFlow, runTab: state.runTab, lead: state.lead, acc: state.acc, more: state.more, tag: state.tag, sc: state.sc, apFilter: state.apFilter, apTier: state.apTier, apSel: state.apSel, secD: state.secD, secA: state.secA, secO: state.secO }); }
 async function show(view, extra = {}) {
   if (SECOF[view]) { extra = { ...extra, [GROUPS[SECOF[view]].key]: view }; view = SECOF[view]; }     // an old tab name opens its section
   Object.assign(state, { view }, extra);
   const sec = GROUPS[view] ? currentSec(view) : null;
-  store.set("orch.ui", { flow: state.flow, runFlow: state.runFlow, acc: state.acc, more: state.more, tag: state.tag, sc: state.sc, apFilter: state.apFilter, apTier: state.apTier, apSel: state.apSel, secD: state.secD, secA: state.secA, secO: state.secO });
+  saveUI();
   document.querySelectorAll("#nav button").forEach(b => b.classList.toggle("active", b.dataset.v === view));
   try { $("#main").innerHTML = (CAN_SAVE ? "" : '<div class="banner warn">Your browser is blocking site storage (a private window, perhaps). The page works and keeps your changes while this tab stays open, but they will not survive a reload.</div>') + await VIEWS[view](); } catch (e) { $("#main").innerHTML = `<p class="no">Could not load: ${esc(e.message)}</p>`; return; }
   const k = sec || view;

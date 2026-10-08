@@ -124,7 +124,13 @@ export default async (req) => {
           observed_at: /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(f.observed_at || "") ? f.observed_at : "2026-09-01T16:00:00Z",
           is_verified: f.is_verified === true, confidence: 0.9 }));
       }
-      const d = await composeDraft(llm, c.input.account, c.input.contact, facts, 1, "Valeria Montes", AS_OF);
+      // The Live Demo can ask about the company on screen: only its display name, size and the contact's first name are taken, never a rule.
+      const company = typeof body.company === "string" && body.company.trim() ? body.company.trim().slice(0, 80) : null;
+      const employees = Number.isFinite(body.employees) && body.employees > 0 ? Math.round(body.employees) : null;
+      const first = typeof body.contact_first_name === "string" && body.contact_first_name.trim() ? body.contact_first_name.trim().slice(0, 40) : null;
+      const account = company ? { ...c.input.account, name: company, employee_count: employees ?? c.input.account.employee_count } : c.input.account;
+      const contact = first ? { ...c.input.contact, first_name: first } : c.input.contact;
+      const d = await composeDraft(llm, account, contact, facts, 1, "Valeria Montes", AS_OF);
       return json(200, { task: "draft", model, case_id: c.case_id, facts, ...d, email_sent: false,
         note: "Display only: this function has no email client." });
     }

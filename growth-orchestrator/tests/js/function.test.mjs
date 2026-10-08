@@ -81,6 +81,15 @@ assert.ok(r.body.body.includes("I saw that Dorada 80"));
 r = await post({ task: "draft", case_id: "EV-G080", facts: [{ text: "Dorada 80 raised 50 million dollars.", is_verified: false }] });
 assert.deepEqual([r.body.mode, r.body.verdict, r.body.attempts.length], ["generic", "no_usable_facts", 0]);  // unverified: AI never called
 
+// 6b. the Live Demo asks about the company on screen: its name and contact are used, the rules still judge the facts
+r = await post({ task: "draft", case_id: "EV-G080", company: "Group Traten", contact_first_name: "Vanessa", employees: 268,
+  facts: [{ text: "Group Traten announced its expansion to Trujillo, Peru.", is_verified: true, observed_at: "2026-09-01T16:00:00Z" }] });
+assert.deepEqual([r.body.mode, r.body.verdict], ["personalized", "accept"]);
+assert.ok(r.body.body.includes("Hi Vanessa") && r.body.body.includes("Group Traten"));
+r = await post({ task: "draft", case_id: "EV-G080", company: "Group Traten",
+  facts: [{ text: "Dorada 80 announced its expansion.", is_verified: true, observed_at: "2026-09-01T16:00:00Z" }] });
+assert.deepEqual([r.body.mode, r.body.verdict, r.body.attempts.length], ["generic", "no_usable_facts", 0]);   // a fact about another company is not usable
+
 // 7. the function source has no way to send email
 const src = readFileSync(join(fnDir, "orchestrator-llm.mjs"), "utf8") + readFileSync(join(fnDir, "_orchestrator_ai.mjs"), "utf8");
 assert.ok(!/customerio|sendTestEmail|smtp|sendgrid|mailgun|\/send\/email/i.test(src));

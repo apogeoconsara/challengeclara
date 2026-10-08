@@ -152,7 +152,9 @@ def _card(orch, aid: str) -> dict:
     sc = scoring.score(feat, cfg)
     n = lambda q: orch.conn.execute(q, (aid,)).fetchone()[0]
     w = cfg["weights"]
-    return {"name": a["name"], "country": a["country"], "industry": a["industry"], "employees": a["employee_count"],
+    people = rows(orch.conn, "SELECT * FROM contacts WHERE account_id=? ORDER BY contact_id", (aid,))
+    who = next((c for c in people if c["language"] == "en" and c["email_status"] == "valid"), people[0] if people else None)
+    return {"name": a["name"], "contact": {"first": who["first_name"], "name": f'{who["first_name"]} {who["last_name"]}', "title": who["title"]} if who else None, "country": a["country"], "industry": a["industry"], "employees": a["employee_count"],
             "crm": {"status": a["crm_status"], "owner_ae": a["crm_owner_ae_id"], "contacts": n("SELECT COUNT(*) FROM contacts WHERE account_id=?"),
                     "open_deals": n("SELECT COUNT(*) FROM opportunities WHERE account_id=? AND closed_at IS NULL"),
                     "emails_so_far": n("SELECT COUNT(*) FROM outreach_history WHERE account_id=? AND sender_type='automated'"),
@@ -329,10 +331,10 @@ def _lead(aid: str, w: dict, sample: dict, golden: dict, now) -> dict:
     res = orch.process(g["events"][0])
     held = orch.pending_approvals()
     final = res.final_action or res.action
-    contact = next((c for c in w["contacts"].get(aid, []) if c["language"] == "en" and c["email_status"] == "valid"), w["contacts"][aid][0])
+    contact = card["contact"]
     facts = card["facts"]
     act = plain.ACTIONS.get(final, [final, ""])
-    return {"id": aid, "account": card, "contact": {"name": f'{contact["first_name"]} {contact["last_name"]}', "title": contact["title"]},
+    return {"id": aid, "account": card, "contact": {"name": contact["name"], "title": contact["title"]},
             "facts": facts, "decision": {"action": final, "text": act[0], "what": act[1], "codes": [plain.CODES.get(c, c) for c in res.reason_codes]},
             "draft": ({"step": held[0]["step"], "subject": held[0]["subject"], "body": held[0]["body"], "ai": held[0]["mode"] != "generic" and bool(held[0]["claims"]),
                        "claims": held[0]["claims"]} if held else None),
