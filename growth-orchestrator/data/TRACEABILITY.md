@@ -1,4 +1,4 @@
-# Traceability: the challenge PDF → data → tests
+# Traceability: challenge requirement → data → tests
 
 Every backticked path, golden id (`G040`) and recording id (`EV-…:variant`) below is checked by
 `tests/test_alignment.py::test_traceability_references_exist`, so this table cannot drift from the repo.
@@ -6,7 +6,7 @@ Paths are relative to `growth-orchestrator/`. The system built on this data is d
 
 ## What to build
 
-| PDF requirement | Data that exercises it | Checked by |
+| Requirement | Data that exercises it | Checked by |
 |---|---|---|
 | 1. Event / webhook trigger | `data/generated/events.jsonl` (also `data/seed/sample/events.jsonl`): 7 event types in a webhook envelope, weekly bursts | `tests/test_data.py` integrity checks |
 | 2. Persistent account / contact state | `accounts`, `contacts`, `opportunities`, `outreach_history`, `suppression` in `data/generated/growth.sqlite` | `tests/test_data.py::test_sqlite_matches_jsonl` |
@@ -32,7 +32,7 @@ Paths are relative to `growth-orchestrator/`. The system built on this data is d
 
 ## Scenario paragraph
 
-| PDF statement | Data |
+| Statement | Data |
 |---|---|
 | accounts may have **multiple contacts** | 1–5 per account (avg 2.4); ranking rule in `data/POLICY.md`; `G002`, `G015` |
 | already **customers** | `customer` 8%, `churned_customer` 2%; `G003`, `G005` |
@@ -49,7 +49,7 @@ Paths are relative to `growth-orchestrator/`. The system built on this data is d
 
 ## AI section: be prepared to explain
 
-| PDF question | Where the data answers it |
+| Question | Where the data answers it |
 |---|---|
 | why AI for that decision | replies are free text (`data/generated/events.jsonl` `reply_received`); rules cannot parse them |
 | what AI may / may not decide | `data/seed/send_policy.json` → `ai_autonomy` |
@@ -60,7 +60,7 @@ Paths are relative to `growth-orchestrator/`. The system built on this data is d
 
 ## Business impact
 
-| PDF ask | Data |
+| Ask | Data |
 |---|---|
 | funnel | `data/seed/funnel_assumptions.json` (stages, rates, unit economics: ASSUMPTIONS) |
 | experiment vs current process | `data/generated/experiment_assignments.jsonl` (stratified, domain-clustered 50/50), design in `data/seed/funnel_assumptions.json` |
@@ -68,13 +68,13 @@ Paths are relative to `growth-orchestrator/`. The system built on this data is d
 
 ## Presentation
 
-| PDF ask | Data |
+| Ask | Data |
 |---|---|
 | "we may change one assumption" | `assumption_drills` in `data/seed/demo_flows.json`; policy numbers are config in `generator/config.py` and `data/seed/send_policy.json` |
 
 ## The system (built)
 
-| PDF ask | Where |
+| Ask | Where |
 |---|---|
 | event → state → decision → AI/rules → action → audit | `orchestrator/engine.py`, tests in `tests/test_engine.py` |
 | AI eval suite and results | `orchestrator/evals.py`, `evals/results/` |

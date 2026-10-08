@@ -423,7 +423,7 @@ const VIEWS = {
       <details class="card" style="margin-top:12px"><summary><b>How this meets the challenge</b>: every requirement, where to see it, where it is proven</summary><div id="challengeMap" style="margin-top:8px"></div></details>
       <h2>Reference flows</h2>
       <div class="chips">${main.map(chip).join("")}</div>
-      <div class="card" style="margin-bottom:12px"><h3>${esc(f.title)}</h3><div class="d">Challenge requirement: ${esc(f.pdf_requirement)}</div>
+      <div class="card" style="margin-bottom:12px"><h3>${esc(f.title)}</h3><div class="d">Challenge requirement: ${esc(f.requirement)}</div>
       <ul>${f.show.map(s => `<li>${esc(s)}</li>`).join("")}</ul></div>
       ${scen.map(trace).join("")}
       <details class="card" id="moreCases" style="margin-top:18px" ${state.more ? "open" : ""}><summary><b>More cases</b>: ${more.map(x => esc(x.id)).join(", ")} and all ${runs.scenarios.length} golden scenarios</summary>
